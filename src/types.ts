@@ -17,6 +17,9 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   created_at?: string;
+  emp_code?: string;
+  designation?: string;
+  DOJ?: string;
 }
 
 export interface Project {

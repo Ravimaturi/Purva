@@ -68,47 +68,126 @@ export const Dashboard: React.FC = () => {
   const seedData = async () => {
     setLoading(true);
     try {
-      const sampleProjects = [
-        {
-          name: 'Vedic Temple Construction',
-          client_name: 'Sanatana Dharma Trust',
-          description: 'Large scale temple construction with traditional Vedic architecture and intricate stone carvings.',
-          status: 'Construction',
-          progress: 65,
-          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'M Ravi Teja',
-          last_updated: new Date().toISOString()
-        },
-        {
-          name: 'Ashram Renovation',
-          client_name: 'Yoga Life Foundation',
-          description: 'Renovating the main meditation hall and residential quarters using sustainable materials.',
-          status: 'Rough Drawings',
-          progress: 25,
-          deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'G Siva Krishna Sthapathy',
-          last_updated: new Date().toISOString()
-        },
-        {
-          name: 'Heritage Museum Design',
-          client_name: 'Cultural Ministry',
-          description: 'Designing a museum to showcase Vedic artifacts and ancient manuscripts.',
-          status: 'Discussion',
-          progress: 10,
-          deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'DNV Prasad Sthapathy',
-          last_updated: new Date().toISOString()
-        }
-      ];
-
-      const { error: pError } = await supabase.from('projects').insert(sampleProjects);
-      if (pError) throw pError;
-
-      // Seed profiles if they don't exist
+      // 1. Seed profiles if they don't exist
       const { data: existingProfiles } = await supabase.from('profiles').select('id').limit(1);
       if (!existingProfiles || existingProfiles.length === 0) {
         const { error: uError } = await supabase.from('profiles').insert(USERS);
         if (uError) console.error('Error seeding profiles:', uError);
+      }
+
+      // 2. Sample Projects
+      const sampleProjects = [
+        {
+          name: 'Mahadev Temple Complex',
+          client_name: 'Dharma Rakshana Samithi',
+          description: 'A grand temple complex featuring a main sanctum, prayer halls, and traditional stone carvings following Dravidian architecture.',
+          status: 'Construction',
+          progress: 45,
+          deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+          assigned_to: 'Mr. Maturi Ravi Teja',
+          last_updated: new Date().toISOString()
+        },
+        {
+          name: 'Vedic Heritage Museum',
+          client_name: 'Cultural Ministry of India',
+          description: 'Modern museum design integrated with ancient Vedic principles to showcase traditional arts and architecture.',
+          status: 'Rough Drawings',
+          progress: 20,
+          deadline: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+          assigned_to: 'Mr. Daggupati Naga Vara Prasad',
+          last_updated: new Date().toISOString()
+        },
+        {
+          name: 'Spiritual Retreat Center',
+          client_name: 'Ananda Yoga Foundation',
+          description: 'Eco-friendly retreat center with meditation halls, residential blocks, and organic gardens.',
+          status: 'Discussion',
+          progress: 10,
+          deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
+          assigned_to: 'Mr. Gandeti Siva Krishna',
+          last_updated: new Date().toISOString()
+        }
+      ];
+
+      const { data: insertedProjects, error: pError } = await supabase
+        .from('projects')
+        .insert(sampleProjects)
+        .select();
+      
+      if (pError) throw pError;
+
+      if (insertedProjects && insertedProjects.length > 0) {
+        const project1 = insertedProjects[0];
+        const project2 = insertedProjects[1];
+
+        // 3. Sample Tasks
+        const sampleTasks = [
+          {
+            project_id: project1.id,
+            title: 'Foundation Stone Laying Ceremony',
+            status: 'Completed',
+            priority: 'High',
+            assigned_to: 'Mr. Maturi Ravi Teja',
+            deadline: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+            completed_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            project_id: project1.id,
+            title: 'Main Pillar Carving - Phase 1',
+            status: 'In Progress',
+            priority: 'High',
+            assigned_to: 'Mr. Gandeti Siva Krishna',
+            deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            project_id: project1.id,
+            title: 'Procurement of Granite Stones',
+            status: 'Todo',
+            priority: 'Medium',
+            assigned_to: 'Mr. Modukuri Dyanesh Kumar',
+            deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            project_id: project2.id,
+            title: 'Drafting Initial Floor Plans',
+            status: 'In Progress',
+            priority: 'High',
+            assigned_to: 'Mr. Daggupati Naga Vara Prasad',
+            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            project_id: project2.id,
+            title: '3D Visualization of Main Hall',
+            status: 'Todo',
+            priority: 'Medium',
+            assigned_to: 'Mr. Uriti Vishnu',
+            deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ];
+
+        const { error: tError } = await supabase.from('tasks').insert(sampleTasks);
+        if (tError) console.error('Error seeding tasks:', tError);
+
+        // 4. Sample Comments
+        const sampleComments = [
+          {
+            project_id: project1.id,
+            author: 'Mr. Maturi Ravi Teja',
+            text: 'The foundation work is progressing well. We need to ensure the stone quality is consistent.',
+            type: 'internal',
+            created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            project_id: project1.id,
+            author: 'Mr. Gandeti Siva Krishna',
+            text: 'Agreed. I have inspected the latest batch of stones and they look excellent.',
+            type: 'internal',
+            created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ];
+
+        const { error: cError } = await supabase.from('comments').insert(sampleComments);
+        if (cError) console.error('Error seeding comments:', cError);
       }
 
       toast.success('Sample data seeded successfully!');

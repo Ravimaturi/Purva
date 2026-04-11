@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Mail, Shield, User as UserIcon, Calendar, LogOut } from 'lucide-react';
+import { getInitials } from '../lib/utils';
 
 export const Profile: React.FC = () => {
   const { user } = useUser();
@@ -34,8 +35,9 @@ export const Profile: React.FC = () => {
         <Card className="md:col-span-1 border-none shadow-sm">
           <CardContent className="pt-8 flex flex-col items-center text-center">
             <Avatar className="h-32 w-32 border-4 border-white shadow-lg mb-4">
-              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.full_name}`} />
-              <AvatarFallback className="text-2xl">{user.full_name.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="text-3xl bg-indigo-600 text-white font-bold">
+                {getInitials(user.full_name)}
+              </AvatarFallback>
             </Avatar>
             <h2 className="text-xl font-bold text-slate-900">{user.full_name}</h2>
             <Badge className="mt-2 bg-indigo-50 text-indigo-700 border-indigo-100 uppercase tracking-wider text-[10px] font-bold">
@@ -70,10 +72,22 @@ export const Profile: React.FC = () => {
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <UserIcon className="w-3 h-3" /> EMP Code
+                </p>
+                <p className="text-sm font-medium text-slate-900">{user.emp_code || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Shield className="w-3 h-3" /> Designation
+                </p>
+                <p className="text-sm font-medium text-slate-900">{user.designation || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <Calendar className="w-3 h-3" /> Member Since
                 </p>
                 <p className="text-sm font-medium text-slate-900">
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'April 2026'}
+                  {user.DOJ ? new Date(user.DOJ).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
                 </p>
               </div>
             </div>

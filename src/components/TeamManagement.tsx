@@ -26,18 +26,28 @@ import {
 } from './ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from './ui/dropdown-menu';
+import { 
   Search, 
   UserPlus, 
   Edit, 
   Trash2, 
   Shield, 
   User as UserIcon,
-  Mail
+  Mail,
+  ArrowUpDown,
+  Filter
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Profile, UserRole } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
+import { USERS } from '../constants';
+import { cn, getInitials } from '../lib/utils';
 
 export const TeamManagement: React.FC = () => {
   const { user: currentUser } = useUser();
@@ -49,8 +59,19 @@ export const TeamManagement: React.FC = () => {
   const [editData, setEditData] = useState({
     full_name: '',
     email: '',
-    role: 'employee' as UserRole
+    role: 'employee' as UserRole,
+    emp_code: '',
+    designation: '',
+    DOJ: ''
   });
+  
+  // Sorting state
+  const [sortField, setSortField] = useState<keyof Profile>('full_name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Filtering state
+  const [roleFilter, setRoleFilter] = useState<string>('All');
+  const [designationFilter, setDesignationFilter] = useState<string>('All');
 
   useEffect(() => {
     fetchUsers();
@@ -78,7 +99,10 @@ export const TeamManagement: React.FC = () => {
     setEditData({
       full_name: user.full_name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      emp_code: user.emp_code || '',
+      designation: user.designation || '',
+      DOJ: user.DOJ || ''
     });
     setIsEditDialogOpen(true);
   };
@@ -121,10 +145,35 @@ export const TeamManagement: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter(u => {
+      const matchesSearch = u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           u.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+      const matchesDesignation = designationFilter === 'All' || u.designation === designationFilter;
+      
+      return matchesSearch && matchesRole && matchesDesignation;
+    })
+    .sort((a, b) => {
+      const aValue = a[sortField] || '';
+      const bValue = b[sortField] || '';
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  const uniqueDesignations = ['All', ...new Set(users.map(u => u.designation || 'N/A'))];
+  const uniqueRoles = ['All', 'admin', 'employee'];
+
+  const handleSort = (field: keyof Profile) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   if (currentUser?.role !== 'admin') {
     return (
@@ -154,27 +203,95 @@ export const TeamManagement: React.FC = () => {
             />
           </div>
         </div>
-        <Button 
-          className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100"
-          onClick={() => {
-            setSelectedUser(null);
-            setEditData({ full_name: '', email: '', role: 'employee' });
-            setIsEditDialogOpen(true);
-          }}
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          Add Member
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button 
+            className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100 gap-2"
+            onClick={() => {
+              setSelectedUser(null);
+              setEditData({ full_name: '', email: '', role: 'employee', emp_code: '', designation: '', DOJ: '' });
+              setIsEditDialogOpen(true);
+            }}
+          >
+            <UserPlus className="w-4 h-4" />
+            Add Member
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow className="hover:bg-transparent border-slate-100">
-              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Member</TableHead>
-              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Email</TableHead>
-              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Role</TableHead>
-              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Joined</TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  Member
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('full_name')}>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </Button>
+                </div>
+              </TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  EMP Code
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('emp_code')}>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </Button>
+                </div>
+              </TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  Designation
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
+                        <Filter className={cn("w-3 h-3", designationFilter !== 'All' ? "text-indigo-600" : "text-slate-400")} />
+                      </Button>
+                    } />
+                    <DropdownMenuContent align="start" className="rounded-xl">
+                      {uniqueDesignations.map(d => (
+                        <DropdownMenuItem key={d} onClick={() => setDesignationFilter(d)}>
+                          {d}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  Email
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('email')}>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </Button>
+                </div>
+              </TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  Role
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
+                        <Filter className={cn("w-3 h-3", roleFilter !== 'All' ? "text-indigo-600" : "text-slate-400")} />
+                      </Button>
+                    } />
+                    <DropdownMenuContent align="start" className="rounded-xl">
+                      {uniqueRoles.map(r => (
+                        <DropdownMenuItem key={r} onClick={() => setRoleFilter(r)}>
+                          {r}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </TableHead>
+              <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                <div className="flex items-center gap-2">
+                  Joined
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('DOJ')}>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </Button>
+                </div>
+              </TableHead>
               <TableHead className="text-right"></TableHead>
             </TableRow>
           </TableHeader>
@@ -184,8 +301,7 @@ export const TeamManagement: React.FC = () => {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border border-slate-200">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.full_name}`} />
-                      <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">{getInitials(u.full_name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-900">{u.full_name}</span>
@@ -194,6 +310,12 @@ export const TeamManagement: React.FC = () => {
                       )}
                     </div>
                   </div>
+                </TableCell>
+                <TableCell className="text-sm text-slate-600 font-bold">
+                  {u.emp_code || 'N/A'}
+                </TableCell>
+                <TableCell className="text-sm text-slate-500 font-medium italic">
+                  {u.designation || 'N/A'}
                 </TableCell>
                 <TableCell className="text-sm text-slate-500 font-medium">
                   <div className="flex items-center gap-2">
@@ -217,8 +339,7 @@ export const TeamManagement: React.FC = () => {
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-slate-500 font-medium">
-                  {/* @ts-ignore */}
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
+                  {u.DOJ ? new Date(u.DOJ).toLocaleDateString() : 'N/A'}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -284,6 +405,36 @@ export const TeamManagement: React.FC = () => {
                 className="rounded-xl border-slate-200"
                 value={editData.email}
                 onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="emp_code" className="text-xs font-bold uppercase tracking-widest text-slate-400">EMP Code</Label>
+                <Input 
+                  id="emp_code" 
+                  className="rounded-xl border-slate-200"
+                  value={editData.emp_code}
+                  onChange={(e) => setEditData({ ...editData, emp_code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="designation" className="text-xs font-bold uppercase tracking-widest text-slate-400">Designation</Label>
+                <Input 
+                  id="designation" 
+                  className="rounded-xl border-slate-200"
+                  value={editData.designation}
+                  onChange={(e) => setEditData({ ...editData, designation: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="DOJ" className="text-xs font-bold uppercase tracking-widest text-slate-400">Date of Joining (DOJ)</Label>
+              <Input 
+                id="DOJ" 
+                type="date"
+                className="rounded-xl border-slate-200"
+                value={editData.DOJ}
+                onChange={(e) => setEditData({ ...editData, DOJ: e.target.value })}
               />
             </div>
             <div className="space-y-2">

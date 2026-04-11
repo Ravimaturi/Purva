@@ -27,7 +27,10 @@ interface NewProjectDialogProps {
   onSuccess: () => void;
 }
 
+import { useNotifications } from '../contexts/NotificationContext';
+
 export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpenChange, onSuccess }) => {
+  const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -51,6 +54,8 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
 
       if (error) throw error;
 
+      await addNotification('New Project Created', `Project "${formData.name}" has been created by an employee.`);
+      
       toast.success('Project created successfully');
       onSuccess();
       onOpenChange(false);

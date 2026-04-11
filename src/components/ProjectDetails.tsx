@@ -21,7 +21,9 @@ import {
 import { Project, Comment, AuditLog, PaymentStage, Task } from '../types';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { Button } from './ui/button';
+import { cn, getInitials } from '../lib/utils';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
@@ -29,6 +31,7 @@ import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
 import { format, parseISO, isValid } from 'date-fns';
 import { 
@@ -36,8 +39,19 @@ import {
   CheckCircle2 as CheckIcon, 
   Circle, 
   Trash2 as TrashIcon,
-  ListTodo
+  ListTodo,
+  Trash2
 } from 'lucide-react';
+import { PROJECT_STAGES, USERS } from '../constants';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from './ui/select';
+import { KanbanBoard } from './KanbanBoard';
+import { CalendarView } from './CalendarView';
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return 'N/A';
@@ -57,16 +71,22 @@ interface ProjectDetailsProps {
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose, onUpdate }) => {
   const { user } = useUser();
+  const { addNotification } = useNotifications();
   const [comments, setComments] = useState<Comment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskDeadline, setNewTaskDeadline] = useState('');
   const [newStageName, setNewStageName] = useState('');
   const [newStageAmount, setNewStageAmount] = useState('');
   const [newStageDueDate, setNewStageDueDate] = useState('');
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Delete confirmation state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -76,7 +96,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     description: project.description || '',
     progress: project.progress,
     status: project.status,
-    deadline: project.deadline || ''
+    deadline: project.deadline || '',
+    assigned_to: project.assigned_to || ''
   });
 
   useEffect(() => {
@@ -87,7 +108,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
       description: project.description || '',
       progress: project.progress,
       status: project.status,
-      deadline: project.deadline || ''
+      deadline: project.deadline || '',
+      assigned_to: project.assigned_to || ''
     });
   }, [project.id]);
 
@@ -102,6 +124,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
         .eq('id', project.id);
 
       if (error) throw error;
+      
+      await addNotification('Project Updated', `Project "${editData.name}" has been updated by ${user?.full_name}.`);
       
       toast.success('Project updated');
       
@@ -148,6 +172,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
       const { error } = await supabase.from('tasks').insert({
         project_id: project.id,
         title: newTaskTitle,
+        assigned_to: newTaskAssignee || null,
+        deadline: newTaskDeadline || null,
         status: 'Todo',
         priority: 'Medium',
         created_at: new Date().toISOString()
@@ -158,6 +184,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
         throw error;
       }
       setNewTaskTitle('');
+      setNewTaskAssignee('');
+      setNewTaskDeadline('');
       fetchDetails();
       toast.success('Task added');
     } catch (err: any) {
@@ -166,9 +194,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     }
   };
 
-  const toggleTaskStatus = async (task: Task) => {
-    const isCompleting = task.status !== 'Completed';
-    const newStatus = isCompleting ? 'Completed' : 'Todo';
+  const toggleTaskStatus = async (task: Task, forcedStatus?: Task['status']) => {
+    const isCompleting = forcedStatus ? forcedStatus === 'Completed' : task.status !== 'Completed';
+    const newStatus = forcedStatus || (isCompleting ? 'Completed' : 'Todo');
     try {
       const { error } = await supabase
         .from('tasks')
@@ -273,6 +301,20 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     }
   };
 
+  const handleDeleteProject = async () => {
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', project.id);
+      if (error) throw error;
+
+      await addNotification('Project Deleted', `Project "${project.name}" has been deleted.`);
+      toast.success('Project deleted');
+      onUpdate();
+      onClose();
+    } catch (err) {
+      toast.error('Failed to delete project');
+    }
+  };
+
   const totalValue = paymentStages.reduce((sum, stage) => sum + stage.amount, 0);
   const totalReceived = paymentStages.filter(s => s.status === 'Paid').reduce((sum, stage) => sum + stage.amount, 0);
   const totalPending = totalValue - totalReceived;
@@ -358,6 +400,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                 <TabsTrigger value="tasks" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
                   Tasks
                 </TabsTrigger>
+                <TabsTrigger value="kanban" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
+                  Kanban
+                </TabsTrigger>
+                <TabsTrigger value="calendar" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
+                  Calendar
+                </TabsTrigger>
                 <TabsTrigger value="comments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
                   Comments
                 </TabsTrigger>
@@ -381,16 +429,37 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                       </Badge>
                     </div>
                     
-                    <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-2">
-                      <Input 
-                        placeholder="What needs to be done?" 
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        className="rounded-xl border-slate-200 h-11 bg-slate-50/50 focus:bg-white transition-all flex-1"
-                      />
-                      <Button type="submit" className="bg-indigo-600 rounded-xl h-11 px-6 font-bold shadow-lg shadow-indigo-100 w-full sm:w-auto shrink-0">
-                        Add Task
-                      </Button>
+                    <form onSubmit={handleAddTask} className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input 
+                          placeholder="What needs to be done?" 
+                          value={newTaskTitle}
+                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                          className="rounded-xl border-slate-200 h-11 bg-white focus:bg-white transition-all flex-1"
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                          <SelectTrigger className="rounded-xl border-slate-200 h-11 bg-white flex-1">
+                            <SelectValue placeholder="Assign to..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="Unassigned">Unassigned</SelectItem>
+                            {USERS.map(u => (
+                              <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input 
+                          type="date"
+                          value={newTaskDeadline}
+                          onChange={(e) => setNewTaskDeadline(e.target.value)}
+                          className="rounded-xl border-slate-200 h-11 bg-white flex-1"
+                        />
+                        <Button type="submit" className="bg-indigo-600 rounded-xl h-11 px-6 font-bold shadow-lg shadow-indigo-100 w-full sm:w-auto shrink-0">
+                          Add Task
+                        </Button>
+                      </div>
                     </form>
 
                     <div className="space-y-3 pt-2">
@@ -421,6 +490,31 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                                 )}>
                                   {task.title}
                                 </span>
+                                <div className="flex items-center gap-3 mt-1">
+                                  {task.assigned_to && (
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <UserIcon className="w-2.5 h-2.5 text-indigo-600" />
+                                      </div>
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                        {task.assigned_to}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {task.deadline && (
+                                    <div className="flex items-center gap-1.5">
+                                      <CalendarIcon className="w-3 h-3 text-slate-400" />
+                                      <span className={cn(
+                                        "text-[10px] font-bold uppercase tracking-wider",
+                                        new Date(task.deadline) < new Date() && task.status !== 'Completed' 
+                                          ? "text-red-500" 
+                                          : "text-slate-400"
+                                      )}>
+                                        {formatDate(task.deadline)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                                 {task.status === 'Completed' && task.completed_at && (
                                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                     Done {formatDate(task.completed_at)}
@@ -439,6 +533,28 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                           </div>
                         ))
                       )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="kanban" className="mt-0">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-4">Task Kanban Board</h3>
+                      <KanbanBoard tasks={tasks} onStatusChange={toggleTaskStatus} />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="calendar" className="mt-0">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-4">Task Calendar</h3>
+                      <CalendarView 
+                        events={tasks.map(t => ({
+                          id: t.id,
+                          title: t.title,
+                          date: t.deadline,
+                          status: t.status,
+                          type: 'task'
+                        }))} 
+                      />
                     </div>
                   </TabsContent>
 
@@ -472,8 +588,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                       {comments.map((comment) => (
                         <div key={comment.id} className="flex gap-4 group">
                           <Avatar className="h-10 w-10 border-2 border-white shadow-md">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author}`} />
-                            <AvatarFallback>{comment.author.charAt(0)}</AvatarFallback>
+                            <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">
+                              {getInitials(comment.author)}
+                            </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
@@ -672,15 +789,24 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm">
                       <CalendarIcon className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                         {project.status === 'Completed' ? 'Completed On' : 'Target Date'}
                       </p>
-                      <p className="text-sm font-bold text-slate-900">
-                        {project.status === 'Completed' 
-                          ? formatDate(project.completed_at || project.deadline) 
-                          : formatDate(project.deadline)}
-                      </p>
+                      {isEditing ? (
+                        <Input 
+                          type="date"
+                          value={editData.deadline}
+                          onChange={(e) => setEditData({ ...editData, deadline: e.target.value })}
+                          className="text-sm font-bold text-slate-900 h-8 mt-1 rounded-lg border-slate-200"
+                        />
+                      ) : (
+                        <p className="text-sm font-bold text-slate-900">
+                          {project.status === 'Completed' 
+                            ? formatDate(project.completed_at || project.deadline) 
+                            : formatDate(project.deadline)}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -688,9 +814,26 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm">
                       <UserIcon className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Project Lead</p>
-                      <p className="text-sm font-bold text-slate-900">{project.assigned_to}</p>
+                      {isEditing ? (
+                        <Select 
+                          value={editData.assigned_to} 
+                          onValueChange={(v) => setEditData({ ...editData, assigned_to: v })}
+                        >
+                          <SelectTrigger className="h-8 mt-1 rounded-lg border-slate-200 text-sm font-bold">
+                            <SelectValue placeholder="Select Lead" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="Unassigned">Unassigned</SelectItem>
+                            {USERS.map(u => (
+                              <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm font-bold text-slate-900">{project.assigned_to || 'Unassigned'}</p>
+                      )}
                     </div>
                   </div>
 
@@ -698,9 +841,25 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm">
                       <AlertCircle className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Current Status</p>
-                      <p className="text-sm font-bold text-slate-900">{project.status}</p>
+                      {isEditing ? (
+                        <Select 
+                          value={editData.status} 
+                          onValueChange={(v) => setEditData({ ...editData, status: v as any })}
+                        >
+                          <SelectTrigger className="h-8 mt-1 rounded-lg border-slate-200 text-sm font-bold">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {PROJECT_STAGES.map(stage => (
+                              <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm font-bold text-slate-900">{project.status}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -711,10 +870,31 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
               {/* Description Section */}
               <div className="space-y-4">
                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">About Project</h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  {project.description || 'No detailed description available for this project.'}
-                </p>
+                {isEditing ? (
+                  <Textarea 
+                    value={editData.description}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                    className="text-xs text-slate-600 leading-relaxed font-medium min-h-[100px] rounded-xl border-slate-200"
+                  />
+                ) : (
+                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                    {project.description || 'No detailed description available for this project.'}
+                  </p>
+                )}
               </div>
+              
+              {isEditing && (
+                <div className="pt-4">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl font-bold h-10 gap-2"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Project
+                  </Button>
+                </div>
+              )}
             </div>
           </ScrollArea>
           
@@ -729,10 +909,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
           </div>
         </aside>
       </div>
+      <ConfirmDialog 
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? This action cannot be undone and all associated data will be removed."
+      />
     </div>
   );
 };
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
-}

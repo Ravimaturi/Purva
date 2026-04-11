@@ -1,152 +1,161 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar } from './ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { supabase } from '../lib/supabase';
-import { Project } from '../types';
-import { format, isSameDay, parseISO } from 'date-fns';
+import React, { useState } from 'react';
+import { Task } from '../types';
+import { cn } from '../lib/utils';
 import { 
-  Calendar as CalendarIcon, 
+  ChevronLeft, 
   ChevronRight, 
-  MapPin, 
-  User as UserIcon,
-  Clock
+  User, 
+  CheckCircle2, 
+  Circle, 
+  Clock 
 } from 'lucide-react';
-import { ScrollArea } from './ui/scroll-area';
+import { 
+  format, 
+  addMonths, 
+  subMonths, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  isSameMonth, 
+  isSameDay, 
+  addDays, 
+  parseISO,
+  isValid
+} from 'date-fns';
 
-export const CalendarView: React.FC = () => {
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string | null;
+  status?: string;
+  type: 'task' | 'project';
+  project_name?: string;
+}
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+interface CalendarViewProps {
+  events: CalendarEvent[];
+}
 
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*');
-      
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-    } finally {
-      setLoading(false);
-    }
+export const CalendarView: React.FC<CalendarViewProps> = ({ events }) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+
+  const renderHeader = () => {
+    return (
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold text-slate-900 uppercase tracking-widest">
+          {format(currentMonth, 'MMMM yyyy')}
+        </h2>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={prevMonth}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-indigo-600"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={nextMonth}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-indigo-600"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    );
   };
 
-  const selectedDateProjects = projects.filter(p => 
-    p.deadline && isSameDay(parseISO(p.deadline), date || new Date())
-  );
+  const renderDays = () => {
+    const days = [];
+    const date = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 0; i < 7; i++) {
+      days.push(
+        <div key={i} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest py-2">
+          {date[i]}
+        </div>
+      );
+    }
+    return <div className="grid grid-cols-7 mb-2">{days}</div>;
+  };
 
-  const upcomingProjects = projects
-    .filter(p => p.deadline && parseISO(p.deadline) >= new Date())
-    .sort((a, b) => parseISO(a.deadline!).getTime() - parseISO(b.deadline!).getTime())
-    .slice(0, 10);
+  const renderCells = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full animate-in fade-in zoom-in-95 duration-500">
-      {/* Calendar Card */}
-      <Card className="lg:col-span-2 border-none shadow-sm overflow-hidden bg-white rounded-3xl">
-        <CardContent className="p-8">
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="flex-1">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-2xl border-none p-0"
-                classNames={{
-                  day_selected: "bg-indigo-600 text-white hover:bg-indigo-700 hover:text-white focus:bg-indigo-600 focus:text-white rounded-xl",
-                  day_today: "bg-slate-100 text-indigo-600 font-bold rounded-xl",
-                  day: "h-12 w-12 p-0 font-medium aria-selected:opacity-100 hover:bg-slate-50 rounded-xl transition-colors",
-                  head_cell: "text-slate-400 font-bold text-[10px] uppercase tracking-widest h-12 w-12",
-                  nav_button: "h-10 w-10 bg-white border border-slate-100 rounded-xl shadow-sm hover:bg-slate-50 text-slate-500",
-                }}
-              />
-            </div>
-            <div className="w-full md:w-80 space-y-6">
-              <div className="space-y-1">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                  {date ? format(date, 'MMMM d') : 'Select a date'}
-                </h3>
-                <p className="text-sm font-bold text-indigo-600 uppercase tracking-widest">
-                  {date ? format(date, 'EEEE, yyyy') : ''}
-                </p>
-              </div>
+    const rows = [];
+    let days = [];
+    let day = startDate;
+    let formattedDate = "";
 
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Clock className="w-3 h-3" />
-                  Deadlines for this day
-                </h4>
-                <div className="space-y-3">
-                  {selectedDateProjects.length > 0 ? (
-                    selectedDateProjects.map(p => (
-                      <div key={p.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors group cursor-pointer">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h5 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{p.name}</h5>
-                            <p className="text-[10px] font-medium text-slate-500 mt-0.5">{p.client_name}</p>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-transform group-hover:translate-x-1" />
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
-                      <CalendarIcon className="w-8 h-8 text-slate-300 mb-2" />
-                      <p className="text-xs font-medium text-slate-400">No deadlines scheduled</p>
-                    </div>
+    while (day <= endDate) {
+      for (let i = 0; i < 7; i++) {
+        formattedDate = format(day, "d");
+        const cloneDay = day;
+        
+        const dayEvents = events.filter(event => {
+          if (!event.date) return false;
+          const eventDate = parseISO(event.date);
+          return isValid(eventDate) && isSameDay(eventDate, cloneDay);
+        });
+
+        days.push(
+          <div
+            key={day.toString()}
+            className={cn(
+              "min-h-[120px] p-2 border border-slate-100 transition-all",
+              !isSameMonth(day, monthStart) ? "bg-slate-50/30 text-slate-300" : "bg-white text-slate-900",
+              isSameDay(day, new Date()) && "bg-indigo-50/30 border-indigo-100"
+            )}
+          >
+            <span className={cn(
+              "text-xs font-bold",
+              isSameDay(day, new Date()) && "text-indigo-600"
+            )}>{formattedDate}</span>
+            
+            <div className="mt-2 space-y-1">
+              {dayEvents.map(event => (
+                <div 
+                  key={`${event.type}-${event.id}`} 
+                  className={cn(
+                    "text-[9px] font-bold p-1 rounded-md truncate border",
+                    event.type === 'project'
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : event.status === 'Completed' 
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                        : "bg-indigo-50 text-indigo-600 border-indigo-100"
                   )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Deadlines */}
-      <Card className="border-none shadow-sm bg-white rounded-3xl overflow-hidden flex flex-col">
-        <CardHeader className="p-6 border-b border-slate-50">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-600" />
-            Upcoming Deadlines
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 flex-1">
-          <ScrollArea className="h-[600px]">
-            <div className="p-6 space-y-6">
-              {upcomingProjects.map((p, i) => (
-                <div key={p.id} className="flex gap-4 group cursor-pointer">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex flex-col items-center justify-center border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                      <span className="text-[10px] font-bold uppercase">{format(parseISO(p.deadline!), 'MMM')}</span>
-                      <span className="text-lg font-black leading-none">{format(parseISO(p.deadline!), 'd')}</span>
-                    </div>
-                    {i !== upcomingProjects.length - 1 && <div className="w-px h-full bg-slate-100" />}
-                  </div>
-                  <div className="flex-1 pt-1 space-y-1">
-                    <h5 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{p.name}</h5>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                        <UserIcon className="w-3 h-3" />
-                        <span>{p.assigned_to}</span>
-                      </div>
-                      <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-full px-2 py-0">
-                        {p.status}
-                      </Badge>
-                    </div>
-                  </div>
+                  title={`${event.type.toUpperCase()}: ${event.title}${event.project_name ? ` (${event.project_name})` : ''}`}
+                >
+                  <span className="opacity-50 mr-1">
+                    {event.type === 'project' ? 'P:' : 'T:'}
+                  </span>
+                  {event.title}
                 </div>
               ))}
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+          </div>
+        );
+        day = addDays(day, 1);
+      }
+      rows.push(
+        <div className="grid grid-cols-7" key={day.toString()}>
+          {days}
+        </div>
+      );
+      days = [];
+    }
+    return <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-sm">{rows}</div>;
+  };
+
+  return (
+    <div className="bg-white rounded-3xl p-4 sm:p-6">
+      {renderHeader()}
+      {renderDays()}
+      {renderCells()}
     </div>
   );
 };

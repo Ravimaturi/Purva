@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { UserProvider } from './contexts/UserContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
-import { KanbanBoard } from './components/KanbanBoard';
-import { CalendarView } from './components/CalendarView';
+import { GlobalKanban } from './components/GlobalKanban';
+import { GlobalCalendar } from './components/GlobalCalendar';
 import { ProjectList } from './components/ProjectList';
 import { TeamManagement } from './components/TeamManagement';
 import { Profile } from './components/Profile';
@@ -19,9 +20,9 @@ export default function App() {
       case 'projects':
         return <ProjectList />;
       case 'kanban':
-        return <KanbanBoard />;
+        return <GlobalKanban />;
       case 'calendar':
-        return <CalendarView />;
+        return <GlobalCalendar />;
       case 'team':
         return <TeamManagement />;
       case 'profile':
@@ -33,10 +34,12 @@ export default function App() {
 
   return (
     <UserProvider>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-        {renderContent()}
-      </Layout>
-      <Toaster position="top-right" />
+      <NotificationProvider>
+        <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+          {renderContent()}
+        </Layout>
+        <Toaster position="top-right" />
+      </NotificationProvider>
     </UserProvider>
   );
 }

@@ -36,8 +36,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Sync current user if they exist in the new data
         if (user) {
           const updatedUser = data.find(u => u.id === user.id);
-          if (updatedUser && (updatedUser.role !== user.role || updatedUser.full_name !== user.full_name)) {
-            setUser(updatedUser);
+          if (updatedUser) {
+            // Check if any field has changed to avoid unnecessary re-renders
+            const hasChanged = JSON.stringify(updatedUser) !== JSON.stringify(user);
+            if (hasChanged) {
+              setUser(updatedUser);
+            }
           }
         }
       }
