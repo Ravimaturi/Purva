@@ -71,6 +71,7 @@ export interface PaymentStage {
   project_id: string;
   stage_name: string;
   amount: number;
+  amount_received: number;
   status: 'Pending' | 'Paid' | 'Overdue';
   due_date: string | null;
 }

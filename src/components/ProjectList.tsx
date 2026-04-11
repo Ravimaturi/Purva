@@ -35,6 +35,7 @@ import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Sheet, SheetContent } from './ui/sheet';
 import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
@@ -53,6 +54,7 @@ const formatDate = (dateStr: string | null) => {
 
 export const ProjectList: React.FC = () => {
   const { addNotification } = useNotifications();
+  const { t } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,7 +178,7 @@ export const ProjectList: React.FC = () => {
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
-              placeholder="Search projects..." 
+              placeholder={t('search_projects')} 
               className="pl-10 bg-white border-slate-200 rounded-xl"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -188,7 +190,7 @@ export const ProjectList: React.FC = () => {
           className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100 w-full sm:w-auto"
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Project
+          {t('add_project')}
         </Button>
       </div>
 
@@ -202,7 +204,7 @@ export const ProjectList: React.FC = () => {
                   onClick={() => handleSort('name')}
                 >
                   <div className="flex items-center">
-                    Project Name <SortIcon field="name" />
+                    {t('project_name')} <SortIcon field="name" />
                   </div>
                 </TableHead>
                 <TableHead 
@@ -210,12 +212,12 @@ export const ProjectList: React.FC = () => {
                   onClick={() => handleSort('client_name')}
                 >
                   <div className="flex items-center">
-                    Client <SortIcon field="client_name" />
+                    {t('client_name')} <SortIcon field="client_name" />
                   </div>
                 </TableHead>
                 <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                    Status
+                    {t('status')}
                     <DropdownMenu>
                       <DropdownMenuTrigger 
                         render={
@@ -238,7 +240,7 @@ export const ProjectList: React.FC = () => {
                 </TableHead>
                 <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap hidden sm:table-cell">
                   <div className="flex items-center gap-2">
-                    Assigned To
+                    {t('assigned_to')}
                     <DropdownMenu>
                       <DropdownMenuTrigger 
                         render={
@@ -262,7 +264,7 @@ export const ProjectList: React.FC = () => {
                   onClick={() => handleSort('deadline')}
                 >
                   <div className="flex items-center">
-                    Deadline <SortIcon field="deadline" />
+                    {t('deadline')} <SortIcon field="deadline" />
                   </div>
                 </TableHead>
                 <TableHead 
@@ -270,7 +272,7 @@ export const ProjectList: React.FC = () => {
                   onClick={() => handleSort('progress')}
                 >
                   <div className="flex items-center">
-                    Progress <SortIcon field="progress" />
+                    {t('progress')} <SortIcon field="progress" />
                   </div>
                 </TableHead>
                 <TableHead className="text-right"></TableHead>

@@ -23,6 +23,7 @@ import { Project, Comment, AuditLog, PaymentStage, Task } from '../types';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Button } from './ui/button';
 import { cn, getInitials } from '../lib/utils';
 import { Badge } from './ui/badge';
@@ -74,6 +75,7 @@ interface ProjectDetailsProps {
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose, onUpdate }) => {
   const { user } = useUser();
   const { addNotification } = useNotifications();
+  const { t } = useLanguage();
   const [comments, setComments] = useState<Comment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
@@ -86,6 +88,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
   const [newStageAmount, setNewStageAmount] = useState('');
   const [newStageDueDate, setNewStageDueDate] = useState('');
   const [newComment, setNewComment] = useState('');
+  const [commentType, setCommentType] = useState<'internal' | 'client'>('internal');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Delete confirmation state
@@ -257,12 +260,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
         project_id: project.id,
         author: user.full_name,
         text: newComment,
-        type: 'internal',
+        type: commentType,
         created_at: new Date().toISOString()
       });
 
       if (error) throw error;
       setNewComment('');
+      setCommentType('internal');
       fetchDetails();
       toast.success('Comment added');
     } catch (err) {
@@ -273,11 +277,41 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     }
   };
 
-  const updatePaymentStatus = async (stageId: string, newStatus: string) => {
+  const updatePaymentReceived = async (stageId: string, amount: number) => {
     try {
+      const stage = paymentStages.find(s => s.id === stageId);
+      if (!stage) return;
+
+      const newStatus = amount >= stage.amount ? 'Paid' : 'Pending';
+
       const { error } = await supabase
         .from('payment_stages')
-        .update({ status: newStatus })
+        .update({ 
+          amount_received: amount,
+          status: newStatus
+        })
+        .eq('id', stageId);
+
+      if (error) throw error;
+      fetchDetails();
+      toast.success('Payment updated');
+    } catch (err) {
+      console.error('Error updating payment:', err);
+      toast.error('Failed to update payment');
+    }
+  };
+
+  const updatePaymentStatus = async (stageId: string, newStatus: string) => {
+    try {
+      const stage = paymentStages.find(s => s.id === stageId);
+      if (!stage) return;
+
+      const { error } = await supabase
+        .from('payment_stages')
+        .update({ 
+          status: newStatus,
+          amount_received: newStatus === 'Paid' ? stage.amount : 0
+        })
         .eq('id', stageId);
 
       if (error) throw error;
@@ -298,6 +332,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
         project_id: project.id,
         stage_name: newStageName,
         amount: parseFloat(newStageAmount),
+        amount_received: 0,
         status: 'Pending',
         due_date: newStageDueDate || null
       });
@@ -339,8 +374,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
   };
 
   const totalValue = paymentStages.reduce((sum, stage) => sum + stage.amount, 0);
-  const totalReceived = paymentStages.filter(s => s.status === 'Paid').reduce((sum, stage) => sum + stage.amount, 0);
+  const totalReceived = paymentStages.reduce((sum, stage) => sum + (stage.amount_received || 0), 0);
   const totalPending = totalValue - totalReceived;
+
+  // Combine tasks and comments for Activity tab
+  const activityItems = [
+    ...tasks.map(t => ({ ...t, activityType: 'task' as const })),
+    ...comments.map(c => ({ ...c, activityType: 'comment' as const }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -388,12 +429,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                 className="h-7 sm:h-8 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-xs font-bold">Refresh</span>
+                <span className="hidden sm:inline text-xs font-bold">{t('refresh')}</span>
               </Button>
               {isEditing ? (
                 <>
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-7 sm:h-8 rounded-lg text-[10px] sm:text-xs font-bold px-2">Cancel</Button>
-                  <Button size="sm" className="h-7 sm:h-8 bg-indigo-600 rounded-lg text-[10px] sm:text-xs font-bold px-3 sm:px-4" onClick={handleUpdateProject}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-7 sm:h-8 rounded-lg text-[10px] sm:text-xs font-bold px-2">{t('cancel')}</Button>
+                  <Button size="sm" className="h-7 sm:h-8 bg-indigo-600 rounded-lg text-[10px] sm:text-xs font-bold px-3 sm:px-4" onClick={handleUpdateProject}>{t('save_changes')}</Button>
                 </>
               ) : (
                 <Button 
@@ -403,7 +444,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                   className="h-7 sm:h-8 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2"
                 >
                   <Edit className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-xs font-bold">Edit</span>
+                  <span className="hidden sm:inline text-xs font-bold">{t('edit_details')}</span>
                 </Button>
               )}
             </div>
@@ -417,26 +458,26 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Main Content Area (Left) */}
         <div className="flex-1 min-w-0 flex flex-col border-r border-slate-100 bg-white">
-          <Tabs defaultValue="tasks" className="flex-1 flex flex-col">
+          <Tabs defaultValue="activity" className="flex-1 flex flex-col">
             <div className="px-8 border-b border-slate-100 bg-slate-50/30">
               <TabsList className="bg-transparent h-14 p-0 gap-4 sm:gap-8 overflow-x-auto no-scrollbar flex-nowrap">
+                <TabsTrigger value="activity" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
+                  {t('activity')}
+                </TabsTrigger>
                 <TabsTrigger value="tasks" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Tasks
+                  {t('tasks')}
                 </TabsTrigger>
                 <TabsTrigger value="kanban" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Kanban
+                  {t('kanban')}
                 </TabsTrigger>
                 <TabsTrigger value="calendar" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Calendar
-                </TabsTrigger>
-                <TabsTrigger value="comments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Comments
+                  {t('calendar')}
                 </TabsTrigger>
                 <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Payments
+                  {t('payments')}
                 </TabsTrigger>
                 <TabsTrigger value="audit" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-xs uppercase tracking-widest whitespace-nowrap">
-                  Audit Log
+                  {t('audit_log')}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -444,6 +485,97 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
             <div className="flex-1 overflow-hidden">
               <ScrollArea className="h-full">
                 <div className="p-4 sm:p-8">
+                  <TabsContent value="activity" className="mt-0 space-y-8">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">{t('recent_activity')}</h3>
+                    </div>
+
+                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4">{t('add_comment')}</h4>
+                      <form onSubmit={handleAddComment} className="space-y-4">
+                        <Textarea 
+                          placeholder="Share an update or ask a question..." 
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="min-h-[100px] rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <Button 
+                              type="button"
+                              variant={commentType === 'internal' ? 'secondary' : 'ghost'} 
+                              size="sm" 
+                              onClick={() => setCommentType('internal')}
+                              className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", commentType === 'internal' && "bg-white shadow-sm")}
+                            >
+                              {t('internal_comment')}
+                            </Button>
+                            <Button 
+                              type="button"
+                              variant={commentType === 'client' ? 'secondary' : 'ghost'} 
+                              size="sm" 
+                              onClick={() => setCommentType('client')}
+                              className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", commentType === 'client' && "bg-white shadow-sm")}
+                            >
+                              {t('client_comment')}
+                            </Button>
+                          </div>
+                          <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 rounded-xl px-6 font-bold shadow-lg shadow-indigo-100">
+                            {t('add_comment')}
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+
+                    <div className="space-y-6">
+                      {activityItems.map((item: any) => (
+                        <div key={item.id} className="relative pl-10">
+                          <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-white border border-slate-100 flex items-center justify-center shadow-sm z-10">
+                            {item.activityType === 'task' ? (
+                              <ListTodo className="w-4 h-4 text-indigo-600" />
+                            ) : (
+                              <MessageSquare className="w-4 h-4 text-amber-600" />
+                            )}
+                          </div>
+                          <div className={cn(
+                            "p-4 rounded-2xl border transition-all",
+                            item.activityType === 'comment' && item.type === 'client' 
+                              ? "bg-amber-50 border-amber-100 shadow-sm" 
+                              : "bg-white border-slate-100 shadow-sm"
+                          )}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900">{item.author || item.assigned_to || 'System'}</span>
+                                {item.activityType === 'comment' && item.type === 'client' && (
+                                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[8px] font-black uppercase tracking-tighter">
+                                    {t('client_comment')}
+                                  </Badge>
+                                )}
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                  {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                                </span>
+                              </div>
+                              {item.activityType === 'task' && (
+                                <Badge variant={item.status === 'Completed' ? 'default' : 'secondary'} className={cn(
+                                  "text-[8px] font-black uppercase tracking-tighter",
+                                  item.status === 'Completed' ? "bg-emerald-500" : "bg-slate-100"
+                                )}>
+                                  {item.status}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                              {item.activityType === 'task' ? `Task: ${item.title}` : item.text}
+                            </p>
+                            {item.activityType === 'task' && item.description && (
+                              <p className="text-xs text-slate-400 mt-1 italic">{item.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+
                   <TabsContent value="tasks" className="mt-0 space-y-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Project Tasks</h3>
@@ -690,33 +822,33 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
                       <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider flex items-center gap-2">
                         <AlertCircle className="w-3 h-3" />
-                        How it works
+                        {t('how_it_works')}
                       </p>
                       <p className="text-xs text-indigo-600 mt-1 leading-relaxed">
-                        Add payment stages below. Once a stage is marked as <strong>"Paid"</strong>, the amount will be added to the <strong>"Received"</strong> total and tracked in your Dashboard.
+                        Add payment stages below. You can track partial payments by updating the <strong>"Amount Received"</strong> field for each stage.
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                       <div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-100 relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
-                        <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest mb-1">Total Value</p>
+                        <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest mb-1">{t('total_value')}</p>
                         <h3 className="text-2xl font-black">₹ {totalValue.toLocaleString()}</h3>
                       </div>
                       <div className="bg-emerald-500 p-5 rounded-3xl text-white shadow-lg shadow-emerald-100 relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
-                        <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mb-1">Received</p>
+                        <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-widest mb-1">{t('amount_received')}</p>
                         <h3 className="text-2xl font-black">₹ {totalReceived.toLocaleString()}</h3>
                       </div>
                       <div className="bg-amber-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-100 relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
-                        <p className="text-amber-100 text-[10px] font-bold uppercase tracking-widest mb-1">Pending</p>
+                        <p className="text-amber-100 text-[10px] font-bold uppercase tracking-widest mb-1">{t('pending_payments')}</p>
                         <h3 className="text-2xl font-black">₹ {totalPending.toLocaleString()}</h3>
                       </div>
                     </div>
 
                     <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4">New Payment Stage</h4>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4">{t('add_payment')}</h4>
                       <form onSubmit={handleAddPaymentStage} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="sm:col-span-3">
                           <Input 
@@ -728,7 +860,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                         </div>
                         <Input 
                           type="number" 
-                          placeholder="Amount (₹)" 
+                          placeholder={t('amount')} 
                           value={newStageAmount}
                           onChange={(e) => setNewStageAmount(e.target.value)}
                           className="rounded-xl border-slate-200 bg-white"
@@ -740,14 +872,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                           className="rounded-xl border-slate-200 bg-white"
                         />
                         <Button type="submit" className="bg-indigo-600 rounded-xl font-bold shadow-lg shadow-indigo-100">
-                          Add Stage
+                          {t('add_payment')}
                         </Button>
                       </form>
                     </div>
 
                     <div className="space-y-4">
                       {paymentStages.map((stage) => (
-                        <div key={stage.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                        <div key={stage.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group gap-4">
                           <div className="flex items-center gap-5">
                             <div className={cn(
                               "w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm",
@@ -757,24 +889,33 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                             </div>
                             <div>
                               <h4 className="text-sm font-bold text-slate-900">{stage.stage_name}</h4>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Due {formatDate(stage.due_date)}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{t('due_date')} {formatDate(stage.due_date)}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-6">
-                            <div className="text-right">
-                              <p className="text-base font-black text-slate-900">₹ {stage.amount.toLocaleString()}</p>
-                              <Button 
-                                size="sm"
-                                variant={stage.status === 'Paid' ? "secondary" : "default"}
-                                onClick={() => updatePaymentStatus(stage.id, stage.status === 'Paid' ? 'Pending' : 'Paid')}
-                                className={cn(
-                                  "h-7 rounded-lg text-[10px] font-bold uppercase tracking-widest mt-1 px-3",
-                                  stage.status === 'Paid' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none" : "bg-indigo-600 hover:bg-indigo-700"
-                                )}
-                              >
-                                {stage.status === 'Paid' ? 'Paid' : 'Mark as Paid'}
-                              </Button>
+                          
+                          <div className="flex flex-1 items-center gap-4 sm:justify-end">
+                            <div className="flex flex-col items-end gap-1">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount')}</p>
+                              <p className="text-sm font-black text-slate-900">₹ {stage.amount.toLocaleString()}</p>
                             </div>
+                            
+                            <div className="flex flex-col items-end gap-1 min-w-[120px]">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount_received')}</p>
+                              <div className="flex items-center gap-2">
+                                <Input 
+                                  type="number"
+                                  value={stage.amount_received || 0}
+                                  onChange={(e) => updatePaymentReceived(stage.id, parseFloat(e.target.value) || 0)}
+                                  className="h-8 w-24 text-xs font-bold rounded-lg border-slate-200"
+                                />
+                                {stage.amount_received >= stage.amount ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-amber-500" />
+                                )}
+                              </div>
+                            </div>
+
                             <Button 
                               variant="ghost" 
                               size="icon" 
@@ -826,7 +967,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
               {/* Progress Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Overall Progress</h3>
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{t('progress')}</h3>
                   <span className="text-sm font-black text-indigo-600">{project.progress}%</span>
                 </div>
                 <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
@@ -851,7 +992,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
 
               {/* Details Section */}
               <div className="space-y-6">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Project Details</h3>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{t('about_project')}</h3>
                 
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
@@ -860,7 +1001,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     </div>
                     <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                        {STAGE_LABELS[project.status] === 'Handover' ? 'Completed On' : 'Target Date'}
+                        {STAGE_LABELS[project.status] === 'Handover' ? 'Completed On' : t('target_date')}
                       </p>
                       {isEditing ? (
                         <Input 
@@ -884,7 +1025,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                       <UserIcon className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Project Lead</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('project_lead')}</p>
                       {isEditing ? (
                         <Select 
                           value={editData.assigned_to} 
@@ -911,7 +1052,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                       <AlertCircle className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Current Status</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('current_status')}</p>
                       {isEditing ? (
                         <Select 
                           value={editData.status} 
@@ -967,7 +1108,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
 
               {/* Description Section */}
               <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">About Project</h3>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{t('about_project')}</h3>
                 {isEditing ? (
                   <Textarea 
                     value={editData.description}

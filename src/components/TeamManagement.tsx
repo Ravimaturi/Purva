@@ -46,11 +46,13 @@ import { supabase } from '../lib/supabase';
 import { Profile, UserRole } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { USERS } from '../constants';
 import { cn, getInitials } from '../lib/utils';
 
 export const TeamManagement: React.FC = () => {
   const { user: currentUser } = useUser();
+  const { t } = useLanguage();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,7 +198,7 @@ export const TeamManagement: React.FC = () => {
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
-              placeholder="Search team members..." 
+              placeholder={t('search_team')} 
               className="pl-10 bg-white border-slate-200 rounded-xl"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -213,7 +215,7 @@ export const TeamManagement: React.FC = () => {
             }}
           >
             <UserPlus className="w-4 h-4" />
-            Add Member
+            {t('add_member')}
           </Button>
         </div>
       </div>
@@ -224,7 +226,7 @@ export const TeamManagement: React.FC = () => {
             <TableRow className="hover:bg-transparent border-slate-100">
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  Member
+                  {t('member')}
                   <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('full_name')}>
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </Button>
@@ -232,7 +234,7 @@ export const TeamManagement: React.FC = () => {
               </TableHead>
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  EMP Code
+                  {t('emp_code')}
                   <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('emp_code')}>
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </Button>
@@ -240,7 +242,7 @@ export const TeamManagement: React.FC = () => {
               </TableHead>
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  Designation
+                  {t('designation')}
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
                       <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
@@ -259,7 +261,7 @@ export const TeamManagement: React.FC = () => {
               </TableHead>
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  Email
+                  {t('email')}
                   <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('email')}>
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </Button>
@@ -267,7 +269,7 @@ export const TeamManagement: React.FC = () => {
               </TableHead>
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  Role
+                  {t('role')}
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
                       <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
@@ -286,7 +288,7 @@ export const TeamManagement: React.FC = () => {
               </TableHead>
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
-                  Joined
+                  {t('joined')}
                   <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200" onClick={() => handleSort('DOJ')}>
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </Button>

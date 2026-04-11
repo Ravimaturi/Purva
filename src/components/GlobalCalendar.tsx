@@ -3,14 +3,24 @@ import { supabase } from '../lib/supabase';
 import { Task, Project } from '../types';
 import { CalendarView } from './CalendarView';
 import { useUser } from '../contexts/UserContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Filter } from 'lucide-react';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from './ui/select';
 
 export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> = ({ onProjectClick }) => {
   const { user } = useUser();
+  const { t } = useLanguage();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
   useEffect(() => {
     if (user) {
@@ -67,6 +77,10 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
     }
   };
 
+  const filteredEvents = selectedProjectId === 'all' 
+    ? events 
+    : events.filter(e => e.project_id === selectedProjectId);
+
   const handleEventClick = (event: any) => {
     const project = projects.find(p => p.id === event.project_id);
     if (project) {
@@ -84,15 +98,33 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Overall Calendar</h2>
-        <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-            Showing {events.length} events {user?.role !== 'admin' ? 'related to you' : 'across all projects'}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('calendar')}</h2>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="w-[200px] border-none shadow-none h-8 p-0 focus:ring-0 text-xs font-bold">
+                <SelectValue placeholder={t('filter_by_project')} />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">{t('all_projects')}</SelectItem>
+                {projects.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              Showing {filteredEvents.length} events
+            </p>
+          </div>
         </div>
       </div>
-      <CalendarView events={events} onEventClick={handleEventClick} />
+      <CalendarView events={filteredEvents} onEventClick={handleEventClick} />
     </div>
   );
 };

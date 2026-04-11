@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UserProvider } from './contexts/UserContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { GlobalKanban } from './components/GlobalKanban';
@@ -46,28 +47,30 @@ export default function App() {
   };
 
   return (
-    <UserProvider>
-      <NotificationProvider>
-        <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-          {renderContent()}
-        </Layout>
-        
-        <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-          <SheetContent className="sm:max-w-[85vw] w-full p-0 border-l-slate-200 shadow-2xl">
-            {selectedProject && (
-              <ProjectDetails 
-                project={selectedProject} 
-                onClose={() => setIsDetailsOpen(false)} 
-                onUpdate={() => {
-                  // Refresh data if needed
-                }}
-              />
-            )}
-          </SheetContent>
-        </Sheet>
+    <LanguageProvider>
+      <UserProvider>
+        <NotificationProvider>
+          <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+            {renderContent()}
+          </Layout>
+          
+          <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+            <SheetContent className="sm:max-w-[85vw] w-full p-0 border-l-slate-200 shadow-2xl">
+              {selectedProject && (
+                <ProjectDetails 
+                  project={selectedProject} 
+                  onClose={() => setIsDetailsOpen(false)} 
+                  onUpdate={() => {
+                    // Refresh data if needed
+                  }}
+                />
+              )}
+            </SheetContent>
+          </Sheet>
 
-        <Toaster position="top-right" />
-      </NotificationProvider>
-    </UserProvider>
+          <Toaster position="top-right" />
+        </NotificationProvider>
+      </UserProvider>
+    </LanguageProvider>
   );
 }

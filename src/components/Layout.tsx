@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -39,18 +40,19 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const { user, setUser, allUsers } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { language, setLanguage, t } = useLanguage();
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'projects', label: 'Projects List', icon: ListTodo },
-    { id: 'project-kanban', label: 'Project Kanban', icon: Trello },
-    { id: 'kanban', label: 'Task Kanban', icon: Trello },
-    { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
+    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'projects', label: t('projects'), icon: ListTodo },
+    { id: 'project-kanban', label: t('project_status'), icon: Trello },
+    { id: 'kanban', label: t('kanban'), icon: Trello },
+    { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
   ];
 
   // Only show Team tab to admins
   if (user?.role === 'admin') {
-    navItems.push({ id: 'team', label: 'Team Management', icon: UsersIcon });
+    navItems.push({ id: 'team', label: t('team'), icon: UsersIcon });
   }
 
   const UserMenuContent = () => (
@@ -192,6 +194,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 mr-2">
+              <Button 
+                variant={language === 'en' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setLanguage('en')}
+                className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", language === 'en' && "bg-white shadow-sm")}
+              >
+                EN
+              </Button>
+              <Button 
+                variant={language === 'te' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setLanguage('te')}
+                className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", language === 'te' && "bg-white shadow-sm")}
+              >
+                తెలుగు
+              </Button>
+            </div>
+
             <DropdownMenu>
               <DropdownMenuTrigger 
                 render={

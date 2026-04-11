@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Project } from '../types';
 import { PROJECT_STAGES, USERS, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
@@ -45,6 +46,7 @@ export const Dashboard: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
   const { user } = useUser();
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetchProjects();
@@ -223,10 +225,10 @@ export const Dashboard: React.FC = () => {
   };
 
   const stats = [
-    { label: 'Total Projects', value: projects.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Pre-Contract', value: projects.filter(p => STAGE_LABELS[p.status] === 'Pre-Contract').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'In Progress', value: projects.filter(p => STAGE_LABELS[p.status] === 'In Progress').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Handover', value: projects.filter(p => STAGE_LABELS[p.status] === 'Handover').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: t('all_projects'), value: projects.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: t('pre_contract'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Pre-Contract').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: t('in_progress'), value: projects.filter(p => STAGE_LABELS[p.status] === 'In Progress').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: t('handover'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Handover').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ];
 
   const stageData = PROJECT_STAGES.map(stage => ({
@@ -237,14 +239,14 @@ export const Dashboard: React.FC = () => {
   const COLORS = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff', '#f1f5f9', '#f8fafc'];
 
   const filteredProjects = filterStatus 
-    ? projects.filter(p => STAGE_LABELS[p.status] === filterStatus)
+    ? projects.filter(p => STAGE_LABELS[p.status] === filterStatus || t(p.status.toLowerCase().replace(/ /g, '_')) === filterStatus)
     : projects;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Project Overview</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('revenue_overview')}</h1>
           <p className="text-slate-500 text-sm sm:text-base">Welcome back, <span className="text-indigo-600 font-semibold">{user?.full_name}</span>! Here's what's happening.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -277,16 +279,7 @@ export const Dashboard: React.FC = () => {
             className="rounded-xl border-slate-200 bg-white flex-1 sm:flex-none"
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={seedData} 
-            disabled={loading}
-            className="rounded-xl border-slate-200 bg-white flex-1 sm:flex-none"
-          >
-            Seed Data
+            {t('add_project')}
           </Button>
         </div>
       </div>
@@ -323,7 +316,7 @@ export const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-indigo-600" />
-              Projects by Stage
+              {t('project_status')}
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[400px]">
@@ -374,7 +367,7 @@ export const Dashboard: React.FC = () => {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-indigo-600" />
-                {filterStatus ? `${filterStatus} Projects` : 'Recent Projects'}
+                {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
               </CardTitle>
               {filterStatus && (
                 <Button variant="ghost" size="sm" onClick={() => setFilterStatus(null)} className="h-8 text-xs font-bold text-indigo-600">
@@ -424,7 +417,7 @@ export const Dashboard: React.FC = () => {
             <CardHeader>
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Clock className="w-5 h-5 text-indigo-600" />
-                Recent Activity
+                {t('recent_activity')}
               </CardTitle>
             </CardHeader>
             <CardContent>
