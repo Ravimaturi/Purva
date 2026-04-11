@@ -28,7 +28,7 @@ import { Button } from './ui/button';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { Project } from '../types';
-import { PROJECT_STAGES, USERS } from '../constants';
+import { PROJECT_STAGES, USERS, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
@@ -91,7 +91,7 @@ export const Dashboard: React.FC = () => {
           name: 'Vedic Heritage Museum',
           client_name: 'Cultural Ministry of India',
           description: 'Modern museum design integrated with ancient Vedic principles to showcase traditional arts and architecture.',
-          status: 'Rough Drawings',
+          status: 'Advance Received',
           progress: 20,
           deadline: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
           assigned_to: 'Mr. Daggupati Naga Vara Prasad',
@@ -105,6 +105,27 @@ export const Dashboard: React.FC = () => {
           progress: 10,
           deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
           assigned_to: 'Mr. Gandeti Siva Krishna',
+          last_updated: new Date().toISOString()
+        },
+        {
+          name: 'Ancient Temple Restoration',
+          client_name: 'Archaeological Survey',
+          description: 'Restoration of a 12th-century temple structure including structural reinforcement and stone cleaning.',
+          status: 'Work is on hold',
+          progress: 35,
+          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          assigned_to: 'Mr. Modukuri Dyanesh Kumar',
+          last_updated: new Date().toISOString()
+        },
+        {
+          name: 'Community Prayer Hall',
+          client_name: 'Village Panchayat',
+          description: 'A simple yet elegant prayer hall for the local community, completed with traditional aesthetics.',
+          status: 'Completed',
+          progress: 100,
+          deadline: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          completed_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          assigned_to: 'Mr. Uriti Vishnu',
           last_updated: new Date().toISOString()
         }
       ];
@@ -203,20 +224,20 @@ export const Dashboard: React.FC = () => {
 
   const stats = [
     { label: 'Total Projects', value: projects.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'In Discussion', value: projects.filter(p => p.status === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'In Construction', value: projects.filter(p => p.status === 'Construction').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Completed', value: projects.filter(p => p.status === 'Completed').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Pre-Contract', value: projects.filter(p => STAGE_LABELS[p.status] === 'Pre-Contract').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'In Progress', value: projects.filter(p => STAGE_LABELS[p.status] === 'In Progress').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Handover', value: projects.filter(p => STAGE_LABELS[p.status] === 'Handover').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ];
 
   const stageData = PROJECT_STAGES.map(stage => ({
-    name: stage,
+    name: STAGE_LABELS[stage],
     count: projects.filter(p => p.status === stage).length
   }));
 
   const COLORS = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff', '#f1f5f9', '#f8fafc'];
 
   const filteredProjects = filterStatus 
-    ? projects.filter(p => p.status === filterStatus)
+    ? projects.filter(p => STAGE_LABELS[p.status] === filterStatus)
     : projects;
 
   return (
@@ -225,6 +246,18 @@ export const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Project Overview</h1>
           <p className="text-slate-500 text-sm sm:text-base">Welcome back, <span className="text-indigo-600 font-semibold">{user?.full_name}</span>! Here's what's happening.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={seedData}
+            disabled={loading}
+            className="rounded-xl border-slate-200 font-bold text-xs uppercase tracking-widest h-10 px-4"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Seed Sample Data
+          </Button>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           {filterStatus && (
@@ -263,10 +296,10 @@ export const Dashboard: React.FC = () => {
         {stats.map((stat, i) => (
           <Card 
             key={i} 
-            onClick={() => setFilterStatus(stat.label === 'Total Projects' ? null : (stat.label === 'In Construction' ? 'Construction' : stat.label))}
+            onClick={() => setFilterStatus(stat.label === 'Total Projects' ? null : stat.label)}
             className={cn(
               "border-none shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer hover:-translate-y-1 active:scale-95",
-              filterStatus === (stat.label === 'In Construction' ? 'Construction' : stat.label) ? "ring-2 ring-indigo-500 bg-indigo-50/30" : ""
+              filterStatus === stat.label ? "ring-2 ring-indigo-500 bg-indigo-50/30" : ""
             )}
           >
             <CardContent className="p-6">
@@ -371,7 +404,7 @@ export const Dashboard: React.FC = () => {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{project.name}</p>
-                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{project.status}</p>
+                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{STAGE_LABELS[project.status]}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -406,7 +439,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-900">
-                        <span className="font-bold">Ravi Teja</span> moved <span className="text-indigo-600">Temple Project</span> to Construction
+                        <span className="font-bold">Ravi Teja</span> moved <span className="text-indigo-600">Temple Project</span> to In Progress
                       </p>
                       <p className="text-xs text-slate-500 mt-1">2 hours ago</p>
                     </div>

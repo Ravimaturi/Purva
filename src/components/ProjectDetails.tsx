@@ -16,7 +16,8 @@ import {
   Image as ImageIcon,
   FileText,
   Edit,
-  Briefcase
+  Briefcase,
+  TrendingUp
 } from 'lucide-react';
 import { Project, Comment, AuditLog, PaymentStage, Task } from '../types';
 import { supabase } from '../lib/supabase';
@@ -42,7 +43,7 @@ import {
   ListTodo,
   Trash2
 } from 'lucide-react';
-import { PROJECT_STAGES, USERS } from '../constants';
+import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
 import { 
   Select, 
   SelectContent, 
@@ -52,6 +53,7 @@ import {
 } from './ui/select';
 import { KanbanBoard } from './KanbanBoard';
 import { CalendarView } from './CalendarView';
+import { Lightbulb } from 'lucide-react';
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return 'N/A';
@@ -77,6 +79,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [newTaskDeadline, setNewTaskDeadline] = useState('');
   const [newStageName, setNewStageName] = useState('');
@@ -87,6 +90,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
   
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isTaskDeleteDialogOpen, setIsTaskDeleteDialogOpen] = useState(false);
+  const [taskIdToDelete, setTaskIdToDelete] = useState<string | null>(null);
   
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -99,6 +104,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     deadline: project.deadline || '',
     assigned_to: project.assigned_to || ''
   });
+
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value);
+    if (!isNaN(val)) {
+      setEditData({ ...editData, progress: Math.min(100, Math.max(0, val)) });
+    }
+  };
 
   useEffect(() => {
     fetchDetails();
@@ -172,6 +184,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
       const { error } = await supabase.from('tasks').insert({
         project_id: project.id,
         title: newTaskTitle,
+        description: newTaskDescription || null,
         assigned_to: newTaskAssignee || null,
         deadline: newTaskDeadline || null,
         status: 'Todo',
@@ -184,6 +197,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
         throw error;
       }
       setNewTaskTitle('');
+      setNewTaskDescription('');
       setNewTaskAssignee('');
       setNewTaskDeadline('');
       fetchDetails();
@@ -192,6 +206,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
       console.error('Failed to add task:', err);
       toast.error(`Failed to add task: ${err.message || 'Unknown error'}`);
     }
+  };
+
+  const handleAddTemplateTask = (title: string) => {
+    setNewTaskTitle(title);
+    toast.info(`Title set to: ${title}. You can now add more details.`);
   };
 
   const toggleTaskStatus = async (task: Task, forcedStatus?: Task['status']) => {
@@ -213,14 +232,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
     }
   };
 
-  const deleteTask = async (id: string) => {
+  const deleteTask = async () => {
+    if (!taskIdToDelete) return;
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      const { error } = await supabase.from('tasks').delete().eq('id', taskIdToDelete);
       if (error) throw error;
       fetchDetails();
       toast.success('Task deleted');
     } catch (err) {
       toast.error('Failed to delete task');
+    } finally {
+      setTaskIdToDelete(null);
+      setIsTaskDeleteDialogOpen(false);
     }
   };
 
@@ -347,7 +370,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight truncate">{project.name}</h2>
                   <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-bold uppercase text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0 shrink-0">
-                    {project.status}
+                    {STAGE_LABELS[project.status]}
                   </Badge>
                 </div>
                 <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">Client: <span className="text-slate-900 font-bold">{project.client_name}</span></p>
@@ -430,12 +453,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     </div>
                     
                     <form onSubmit={handleAddTask} className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex flex-col gap-2">
                         <Input 
                           placeholder="What needs to be done?" 
                           value={newTaskTitle}
                           onChange={(e) => setNewTaskTitle(e.target.value)}
-                          className="rounded-xl border-slate-200 h-11 bg-white focus:bg-white transition-all flex-1"
+                          className="rounded-xl border-slate-200 h-11 bg-white focus:bg-white transition-all w-full"
+                        />
+                        <Textarea 
+                          placeholder="Add more details (optional)..." 
+                          value={newTaskDescription}
+                          onChange={(e) => setNewTaskDescription(e.target.value)}
+                          className="rounded-xl border-slate-200 min-h-[80px] bg-white focus:bg-white transition-all w-full"
                         />
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -461,6 +490,35 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                         </Button>
                       </div>
                     </form>
+
+                    {/* Suggested Tasks */}
+                    {TASK_TEMPLATES[project.status] && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-amber-600">
+                          <Lightbulb className="w-4 h-4" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Suggested for {STAGE_LABELS[project.status]}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {TASK_TEMPLATES[project.status]
+                            .filter(title => !tasks.some(t => t.title === title))
+                            .map(title => (
+                              <button
+                                key={title}
+                                onClick={() => handleAddTemplateTask(title)}
+                                className="text-[10px] font-bold px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-full hover:bg-amber-100 transition-all"
+                                title="Click to fill the task name above"
+                              >
+                                + {title}
+                              </button>
+                            ))
+                          }
+                          {TASK_TEMPLATES[project.status].filter(title => !tasks.some(t => t.title === title)).length === 0 && (
+                            <span className="text-[10px] font-medium text-slate-400 italic">All suggested tasks for this stage have been added.</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 italic">Tip: Click a suggestion to fill the name, then add details and click "Add Task".</p>
+                      </div>
+                    )}
 
                     <div className="space-y-3 pt-2">
                       {tasks.length === 0 ? (
@@ -490,6 +548,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                                 )}>
                                   {task.title}
                                 </span>
+                                {task.description && (
+                                  <p className={cn(
+                                    "text-xs mt-0.5",
+                                    task.status === 'Completed' ? "text-slate-300" : "text-slate-500"
+                                  )}>
+                                    {task.description}
+                                  </p>
+                                )}
                                 <div className="flex items-center gap-3 mt-1">
                                   {task.assigned_to && (
                                     <div className="flex items-center gap-1.5">
@@ -525,7 +591,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              onClick={() => deleteTask(task.id)}
+                              onClick={() => {
+                                setTaskIdToDelete(task.id);
+                                setIsTaskDeleteDialogOpen(true);
+                              }}
                               className="opacity-0 group-hover:opacity-100 h-8 w-8 text-slate-300 hover:text-red-500 transition-all"
                             >
                               <TrashIcon className="w-4 h-4" />
@@ -560,7 +629,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
 
                   <TabsContent value="comments" className="mt-0 space-y-8">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Discussion</h3>
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Discussion & Updates</h3>
                       <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-full font-bold">
                         {comments.length} Comments
                       </Badge>
@@ -791,7 +860,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                     </div>
                     <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                        {project.status === 'Completed' ? 'Completed On' : 'Target Date'}
+                        {STAGE_LABELS[project.status] === 'Handover' ? 'Completed On' : 'Target Date'}
                       </p>
                       {isEditing ? (
                         <Input 
@@ -802,7 +871,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                         />
                       ) : (
                         <p className="text-sm font-bold text-slate-900">
-                          {project.status === 'Completed' 
+                          {STAGE_LABELS[project.status] === 'Handover' 
                             ? formatDate(project.completed_at || project.deadline) 
                             : formatDate(project.deadline)}
                         </p>
@@ -853,15 +922,44 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             {PROJECT_STAGES.map(stage => (
-                              <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                              <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="text-sm font-bold text-slate-900">{project.status}</p>
+                        <p className="text-sm font-bold text-slate-900">{STAGE_LABELS[project.status]}</p>
                       )}
                     </div>
                   </div>
+
+                  {isEditing && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Progress (%)</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <Input 
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={editData.progress}
+                            onChange={handleProgressChange}
+                            className="text-sm font-bold text-slate-900 h-8 rounded-lg border-slate-200 w-20"
+                          />
+                          <input 
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={editData.progress}
+                            onChange={(e) => setEditData({ ...editData, progress: parseInt(e.target.value) })}
+                            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -909,6 +1007,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onClose
           </div>
         </aside>
       </div>
+      <ConfirmDialog 
+        open={isTaskDeleteDialogOpen}
+        onOpenChange={setIsTaskDeleteDialogOpen}
+        onConfirm={deleteTask}
+        title="Delete Task"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+      />
       <ConfirmDialog 
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}

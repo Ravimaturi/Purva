@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Project } from '../types';
+import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -226,7 +227,9 @@ export const ProjectList: React.FC = () => {
                       <DropdownMenuContent align="start" className="rounded-xl">
                         {uniqueStatuses.map(status => (
                           <DropdownMenuItem key={status} onClick={() => setStatusFilter(status)}>
-                            <span className={cn(statusFilter === status && "font-bold text-indigo-600")}>{status}</span>
+                            <span className={cn(statusFilter === status && "font-bold text-indigo-600")}>
+                              {status === 'All' ? 'All' : STAGE_LABELS[status as any] || status}
+                            </span>
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -288,12 +291,19 @@ export const ProjectList: React.FC = () => {
                 </TableRow>
               ) : (
                 filteredAndSortedProjects.map((project) => (
-                  <TableRow key={project.id} className="hover:bg-slate-50/50 border-slate-50 group">
+                  <TableRow 
+                    key={project.id} 
+                    className="hover:bg-slate-50/50 border-slate-50 group cursor-pointer"
+                    onClick={() => {
+                      setSelectedProject(project);
+                      setIsDetailsOpen(true);
+                    }}
+                  >
                     <TableCell className="font-bold text-slate-900 whitespace-nowrap">{project.name}</TableCell>
                     <TableCell className="text-sm text-slate-500 font-medium whitespace-nowrap hidden md:table-cell">{project.client_name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-3 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">
-                        {project.status}
+                        {STAGE_LABELS[project.status]}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
@@ -309,7 +319,7 @@ export const ProjectList: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-slate-500 font-medium whitespace-nowrap hidden lg:table-cell">
-                      {project.status === 'Completed' 
+                      {STAGE_LABELS[project.status] === 'Handover' 
                         ? formatDate(project.completed_at || project.deadline) 
                         : formatDate(project.deadline)}
                     </TableCell>
@@ -323,7 +333,10 @@ export const ProjectList: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="rounded-full h-8 w-8 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors outline-none">
+                        <DropdownMenuTrigger 
+                          className="rounded-full h-8 w-8 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors outline-none"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl border-slate-200 shadow-lg">

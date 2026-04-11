@@ -2,11 +2,8 @@ export type ProjectStatus =
   | 'Discussion' 
   | 'Proposal Sent' 
   | 'Advance Received' 
-  | 'Rough Drawings' 
-  | 'Client\'s Approval' 
-  | 'Section Drawings and Layer Drawings' 
+  | 'Construction' 
   | 'Work is on hold' 
-  | 'Construction'
   | 'Completed';
 
 export type UserRole = 'admin' | 'employee';

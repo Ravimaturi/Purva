@@ -6,10 +6,11 @@ import { useUser } from '../contexts/UserContext';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-export const GlobalCalendar: React.FC = () => {
+export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> = ({ onProjectClick }) => {
   const { user } = useUser();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -20,6 +21,15 @@ export const GlobalCalendar: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Fetch Projects (for deadlines and mapping)
+      let projectsQuery = supabase.from('projects').select('*');
+      if (user?.role !== 'admin') {
+        projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
+      }
+      const { data: projectsData, error: projectsError } = await projectsQuery;
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
+
       // Fetch Tasks
       let tasksQuery = supabase.from('tasks').select('*, projects(name)');
       if (user?.role !== 'admin') {
@@ -28,20 +38,13 @@ export const GlobalCalendar: React.FC = () => {
       const { data: tasksData, error: tasksError } = await tasksQuery;
       if (tasksError) throw tasksError;
 
-      // Fetch Projects (for deadlines)
-      let projectsQuery = supabase.from('projects').select('*');
-      if (user?.role !== 'admin') {
-        projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
-      }
-      const { data: projectsData, error: projectsError } = await projectsQuery;
-      if (projectsError) throw projectsError;
-
       const taskEvents = (tasksData || []).map((t: any) => ({
         id: t.id,
         title: t.title,
         date: t.deadline,
         status: t.status,
         type: 'task',
+        project_id: t.project_id,
         project_name: t.projects?.name
       }));
 
@@ -51,6 +54,7 @@ export const GlobalCalendar: React.FC = () => {
         date: p.deadline,
         status: p.status,
         type: 'project',
+        project_id: p.id,
         project_name: p.name
       }));
 
@@ -60,6 +64,13 @@ export const GlobalCalendar: React.FC = () => {
       toast.error('Failed to load calendar');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEventClick = (event: any) => {
+    const project = projects.find(p => p.id === event.project_id);
+    if (project) {
+      onProjectClick(project);
     }
   };
 
@@ -81,7 +92,7 @@ export const GlobalCalendar: React.FC = () => {
           </p>
         </div>
       </div>
-      <CalendarView events={events} />
+      <CalendarView events={events} onEventClick={handleEventClick} />
     </div>
   );
 };

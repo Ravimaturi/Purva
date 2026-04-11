@@ -17,7 +17,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from './ui/select';
-import { PROJECT_STAGES, USERS } from '../constants';
+import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
@@ -46,17 +46,40 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
     setLoading(true);
 
     try {
-      const { error } = await supabase.from('projects').insert({
-        ...formData,
-        progress: 0,
-        last_updated: new Date().toISOString(),
-      });
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          ...formData,
+          progress: 0,
+          last_updated: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (projectError) throw projectError;
+
+      // Automatically insert tasks based on the initial status
+      const templates = TASK_TEMPLATES[formData.status] || [];
+      if (templates.length > 0 && projectData) {
+        const tasksToInsert = templates.map(title => ({
+          project_id: projectData.id,
+          title,
+          status: 'Todo',
+          priority: 'Medium',
+          assigned_to: formData.assigned_to,
+          deadline: formData.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }));
+
+        const { error: tasksError } = await supabase.from('tasks').insert(tasksToInsert);
+        if (tasksError) {
+          console.error('Error inserting template tasks:', tasksError);
+          toast.error('Project created, but failed to add initial tasks.');
+        }
+      }
 
       await addNotification('New Project Created', `Project "${formData.name}" has been created by an employee.`);
       
-      toast.success('Project created successfully');
+      toast.success('Project created successfully with initial tasks');
       onSuccess();
       onOpenChange(false);
       setFormData({
@@ -116,7 +139,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   {PROJECT_STAGES.map(stage => (
-                    <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                    <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

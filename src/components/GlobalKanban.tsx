@@ -1,28 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task } from '../types';
+import { Task, Project } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { useUser } from '../contexts/UserContext';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-export const GlobalKanban: React.FC = () => {
+export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = ({ onProjectClick }) => {
   const { user } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      fetchTasks();
+      fetchData();
     }
   }, [user]);
 
-  const fetchTasks = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('tasks').select('*');
-      
-      // If not admin, only show tasks assigned to the user
+      // Fetch Projects
+      let projectsQuery = supabase.from('projects').select('*');
+      if (user?.role !== 'admin') {
+        projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
+      }
+      const { data: projectsData, error: projectsError } = await projectsQuery;
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
+
+      // Fetch Tasks
+      let query = supabase.from('tasks').select('*, projects(name)');
       if (user?.role !== 'admin') {
         query = query.eq('assigned_to', user?.full_name);
       }
@@ -58,6 +67,13 @@ export const GlobalKanban: React.FC = () => {
     }
   };
 
+  const handleTaskClick = (task: Task) => {
+    const project = projects.find(p => p.id === task.project_id);
+    if (project) {
+      onProjectClick(project);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -76,7 +92,7 @@ export const GlobalKanban: React.FC = () => {
           </p>
         </div>
       </div>
-      <KanbanBoard tasks={tasks} onStatusChange={handleStatusChange} />
+      <KanbanBoard tasks={tasks} onStatusChange={handleStatusChange} onTaskClick={handleTaskClick} />
     </div>
   );
 };

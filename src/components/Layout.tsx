@@ -18,6 +18,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
+  DropdownMenuGroup,
   DropdownMenuItem, 
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
@@ -42,7 +43,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'projects', label: 'Projects List', icon: ListTodo },
-    { id: 'kanban', label: 'Kanban Board', icon: Trello },
+    { id: 'project-kanban', label: 'Project Kanban', icon: Trello },
+    { id: 'kanban', label: 'Task Kanban', icon: Trello },
     { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
   ];
 
@@ -68,25 +70,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <span>Team Management</span>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
-      <div className="max-h-60 overflow-y-auto px-1">
-        {allUsers.map((u) => (
-          <DropdownMenuItem 
-            key={u.id} 
-            onClick={() => {
-              setUser(u as any);
-              toast.success(`Switched to ${u.full_name}`);
-            }}
-            className={cn(
-              "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
-              user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
-            )}
-          >
-            <span className="font-bold text-xs">{u.full_name}</span>
-            <span className="text-[10px] opacity-70">{u.role}</span>
-          </DropdownMenuItem>
-        ))}
-      </div>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
+        <div className="max-h-60 overflow-y-auto px-1">
+          {allUsers.map((u) => (
+            <DropdownMenuItem 
+              key={u.id} 
+              onClick={() => {
+                setUser(u as any);
+                toast.success(`Switched to ${u.full_name}`);
+              }}
+              className={cn(
+                "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
+                user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
+              )}
+            >
+              <span className="font-bold text-xs">{u.full_name}</span>
+              <span className="text-[10px] opacity-70">{u.role}</span>
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-red-600" onClick={() => {
         setUser(null);
@@ -107,7 +111,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
           Purva Vedic
         </h1>
-        <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">Project Manager</p>
+        <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">Project Management</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -256,31 +260,35 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 }
               />
               <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 p-2">
-                <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Account Settings</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setActiveTab('profile')}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>My Profile</span>
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Account Settings</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setActiveTab('profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>My Profile</span>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
-                <div className="max-h-60 overflow-y-auto px-1">
-                  {allUsers.map((u) => (
-                    <DropdownMenuItem 
-                      key={u.id} 
-                      onClick={() => {
-                        setUser(u as any);
-                        toast.success(`Switched to ${u.full_name}`);
-                      }}
-                      className={cn(
-                        "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
-                        user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
-                      )}
-                    >
-                      <span className="font-bold text-xs">{u.full_name}</span>
-                      <span className="text-[10px] opacity-70">{u.role}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </div>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
+                  <div className="max-h-60 overflow-y-auto px-1">
+                    {allUsers.map((u) => (
+                      <DropdownMenuItem 
+                        key={u.id} 
+                        onClick={() => {
+                          setUser(u as any);
+                          toast.success(`Switched to ${u.full_name}`);
+                        }}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
+                          user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
+                        )}
+                      >
+                        <span className="font-bold text-xs">{u.full_name}</span>
+                        <span className="text-[10px] opacity-70">{u.role}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={() => {
                   setUser(null);

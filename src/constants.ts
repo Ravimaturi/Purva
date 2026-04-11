@@ -2,15 +2,20 @@ import { ProjectStatus } from './types';
 
 export const PROJECT_STAGES: ProjectStatus[] = [
   'Discussion',
-  'Proposal Sent',
   'Advance Received',
-  'Rough Drawings',
-  'Client\'s Approval',
-  'Section Drawings and Layer Drawings',
-  'Work is on hold',
   'Construction',
+  'Work is on hold',
   'Completed'
 ];
+
+export const STAGE_LABELS: Record<ProjectStatus, string> = {
+  'Discussion': 'Pre-Contract',
+  'Proposal Sent': 'Pre-Contract',
+  'Advance Received': 'Design & Prep',
+  'Construction': 'In Progress',
+  'Work is on hold': 'On Hold',
+  'Completed': 'Handover'
+};
 
 export const USERS = [
   {"id":"74f30132-e39e-4d30-aa88-01bff6750f1a","email":"raviteja.m@purvavedic.com","full_name":"Mr. Maturi Ravi Teja","role":"admin", "DOJ": "2023-07-24", "emp_code": "PVC202301", "designation": "Manager"},
@@ -24,3 +29,45 @@ export const USERS = [
   {"id":"bffe0afb-554c-4783-b932-3a376d4458d7","email":"dhanasekharsthapathy@purvavedic.com","full_name":"Mr. T Dhana Sakhar","role":"employee", "DOJ": "2023-07-24", "emp_code": "PVC202306", "designation": "Asst Sthapathy"},
   {"id":"ebdcf3ae-bb54-48ac-8512-cf58e5e02974","email":"purushottamsthapathy@purvavedic.com","full_name":"Mr. Uppalapati Purushottam Reddy","role":"employee", "DOJ": "2023-07-24", "emp_code": "PVC202304", "designation": "Deputy Sthapathy"}
 ];
+
+export const TASK_TEMPLATES: Record<string, string[]> = {
+  'Discussion': [
+    'Draft Preliminary Proposal',
+    'Generate Rough Concept Sketches',
+    'Conduct Initial Site Measurements',
+    'Client Requirement Sign-off',
+    'Follow-up: Advance Payment',
+    'Execute Work Order / Contract',
+    'Request Technical Site Survey',
+    'Finalize Resource Budget'
+  ],
+  'Advance Received': [
+    'Develop Detailed Section Drawings',
+    'Issue Stone/Idol Purchase Order',
+    'Issue Brass Idol Fabrication Order',
+    'Procure Dwajasthambam Log',
+    'Finalize Temple Cost Estimates',
+    'Initiate 3D Model Production',
+    'Civil Work Update: Week 1'
+  ],
+  'Construction': [
+    'Review/Approve Revised Drawings',
+    'Map Section & Layer Planes',
+    'Detail Elevation Ornaments',
+    'Sign Primary Sub-Contractor Agreement',
+    'Sign Ancillary Vendor Contracts',
+    'Weekly Structural Site Inspection'
+  ],
+  'Work is on hold': [
+    'Document Site Halt Reason',
+    'Contractual Terms Re-validation',
+    'Quarterly Status Site Visit',
+    'Resource Demobilization Log'
+  ],
+  'Completed': [
+    'Verify Final Payment Status',
+    'Audit Labor & Skill Expenses',
+    'Schedule Consecration Ceremony',
+    'Archive Project Documentation'
+  ]
+};

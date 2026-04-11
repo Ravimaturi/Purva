@@ -66,7 +66,7 @@ export const TeamManagement: React.FC = () => {
   });
   
   // Sorting state
-  const [sortField, setSortField] = useState<keyof Profile>('full_name');
+  const [sortField, setSortField] = useState<keyof Profile>('emp_code');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
   // Filtering state
@@ -82,7 +82,7 @@ export const TeamManagement: React.FC = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .order('full_name', { ascending: true });
+        .order('emp_code', { ascending: true });
       
       if (error) throw error;
       setUsers(data || []);

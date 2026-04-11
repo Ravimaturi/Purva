@@ -35,9 +35,10 @@ interface CalendarEvent {
 
 interface CalendarViewProps {
   events: CalendarEvent[];
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ events }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ events, onEventClick }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -120,8 +121,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events }) => {
               {dayEvents.map(event => (
                 <div 
                   key={`${event.type}-${event.id}`} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEventClick?.(event);
+                  }}
                   className={cn(
-                    "text-[9px] font-bold p-1 rounded-md truncate border",
+                    "text-[9px] font-bold p-1 rounded-md truncate border cursor-pointer hover:brightness-95 transition-all",
                     event.type === 'project'
                       ? "bg-amber-50 text-amber-700 border-amber-200"
                       : event.status === 'Completed' 
