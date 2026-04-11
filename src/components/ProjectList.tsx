@@ -16,6 +16,7 @@ import {
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Card, CardContent } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { 
   Search, 
@@ -54,13 +55,14 @@ const formatDate = (dateStr: string | null) => {
 
 export const ProjectList: React.FC = () => {
   const { addNotification } = useNotifications();
-  const { t } = useLanguage();
+  const { t, translateData } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   
   // Delete confirmation state
   const [projectIdToDelete, setProjectIdToDelete] = useState<string | null>(null);
@@ -175,11 +177,11 @@ export const ProjectList: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1 max-w-md">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative w-full group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
             <Input 
               placeholder={t('search_projects')} 
-              className="pl-10 bg-white border-slate-200 rounded-xl"
+              className="pl-10 bg-white border-slate-200 rounded-2xl h-11 focus:ring-2 focus:ring-indigo-500/20 transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -187,14 +189,77 @@ export const ProjectList: React.FC = () => {
         </div>
         <Button 
           onClick={() => setIsNewDialogOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100 w-full sm:w-auto"
+          className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold text-sm transition-all active:scale-95"
         >
           <Plus className="w-4 h-4 mr-2" />
           {t('add_project')}
         </Button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="grid grid-cols-1 gap-4 lg:hidden">
+        {loading ? (
+          [1, 2, 3].map(i => (
+            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 animate-pulse space-y-4">
+              <div className="h-6 bg-slate-100 rounded-lg w-3/4" />
+              <div className="h-4 bg-slate-50 rounded-lg w-1/2" />
+              <div className="h-2 bg-slate-100 rounded-full w-full" />
+            </div>
+          ))
+        ) : filteredAndSortedProjects.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No projects found</p>
+          </div>
+        ) : (
+          filteredAndSortedProjects.map((project) => (
+            <Card 
+              key={project.id} 
+              onClick={() => {
+                setSelectedProject(project);
+                setIsDetailsOpen(true);
+              }}
+              className="border-none shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer overflow-hidden rounded-3xl"
+            >
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1 min-w-0">
+                    <h3 className="font-bold text-slate-900 tracking-tight truncate">{translateData(project.name)}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{translateData(project.client_name)}</p>
+                  </div>
+                  <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter shrink-0">
+                    {STAGE_LABELS[project.status]}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
+                      <AvatarFallback className="bg-indigo-600 text-white font-bold text-[8px]">
+                        {getInitials(project.assigned_to || 'Unassigned')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider truncate max-w-[100px]">
+                      {project.assigned_to ? translateData(project.assigned_to) : 'Unassigned'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Progress</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
+                      </div>
+                      <span className="text-xs font-black text-slate-900">{project.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-slate-50/50">
@@ -281,77 +346,96 @@ export const ProjectList: React.FC = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-slate-400 font-medium">
-                    Loading projects...
+                  <TableCell colSpan={7} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <div className="w-8 h-8 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                      <p className="text-xs font-bold uppercase tracking-widest">Loading projects...</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : filteredAndSortedProjects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-slate-400 font-medium">
-                    No projects found.
+                  <TableCell colSpan={7} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <Search className="w-8 h-8 opacity-20" />
+                      <p className="text-xs font-bold uppercase tracking-widest">No projects found</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAndSortedProjects.map((project) => (
                   <TableRow 
                     key={project.id} 
-                    className="hover:bg-slate-50/50 border-slate-50 group cursor-pointer"
+                    className="hover:bg-indigo-50/30 border-slate-50 group cursor-pointer transition-colors"
                     onClick={() => {
                       setSelectedProject(project);
                       setIsDetailsOpen(true);
                     }}
                   >
-                    <TableCell className="font-bold text-slate-900 whitespace-nowrap">{project.name}</TableCell>
-                    <TableCell className="text-sm text-slate-500 font-medium whitespace-nowrap hidden md:table-cell">{project.client_name}</TableCell>
+                    <TableCell className="py-5 px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                          {project.name.charAt(0)}
+                        </div>
+                        <span className="font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">{translateData(project.name)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap hidden md:table-cell">{translateData(project.client_name)}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-3 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap">
+                      <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-tighter whitespace-nowrap">
                         {STAGE_LABELS[project.status]}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="flex items-center gap-2 whitespace-nowrap">
-                        <Avatar className="h-6 w-6 border border-slate-200">
-                          <AvatarFallback className="bg-indigo-600 text-white font-bold text-[8px]">
+                        <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
+                          <AvatarFallback className="bg-indigo-600 text-white font-bold text-[9px]">
                             {getInitials(project.assigned_to || 'Unassigned')}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-semibold text-slate-700">
-                          {project.assigned_to?.includes('@') ? project.assigned_to.split('@')[0] : (project.assigned_to || 'Unassigned')}
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          {project.assigned_to ? translateData(project.assigned_to) : 'Unassigned'}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-slate-500 font-medium whitespace-nowrap hidden lg:table-cell">
+                    <TableCell className="text-xs text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap hidden lg:table-cell">
                       {STAGE_LABELS[project.status] === 'Handover' 
                         ? formatDate(project.completed_at || project.deadline) 
                         : formatDate(project.deadline)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-3 whitespace-nowrap">
-                        <div className="w-16 sm:w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
+                      <div className="flex items-center gap-4 whitespace-nowrap">
+                        <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
                         </div>
-                        <span className="text-xs font-bold text-slate-500">{project.progress}%</span>
+                        <span className="text-xs font-black text-slate-900 tracking-tighter">{project.progress}%</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right px-6">
                       <DropdownMenu>
                         <DropdownMenuTrigger 
-                          className="rounded-full h-8 w-8 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors outline-none"
+                          className="rounded-xl h-9 w-9 text-slate-400 hover:bg-white hover:shadow-sm flex items-center justify-center transition-all outline-none border border-transparent hover:border-slate-100"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl border-slate-200 shadow-lg">
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedProject(project);
-                            setIsDetailsOpen(true);
-                          }}>
-                            <Eye className="w-4 h-4 mr-2" /> View Details
+                        <DropdownMenuContent align="end" className="rounded-2xl border-slate-200 shadow-xl p-1.5 min-w-[160px]">
+                          <DropdownMenuItem 
+                            className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest"
+                            onClick={() => {
+                              setSelectedProject(project);
+                              setIsDetailsOpen(true);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-2 text-indigo-600" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600" onClick={() => {
-                            setProjectIdToDelete(project.id);
-                            setIsDeleteDialogOpen(true);
-                          }}>
+                          <DropdownMenuItem 
+                            className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest text-red-600 focus:text-red-600 focus:bg-red-50"
+                            onClick={() => {
+                              setProjectIdToDelete(project.id);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
                             <Trash2 className="w-4 h-4 mr-2" /> Delete Project
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -371,13 +455,21 @@ export const ProjectList: React.FC = () => {
         onSuccess={fetchProjects} 
       />
 
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent className="sm:max-w-[85vw] w-full p-0 border-l-slate-200 shadow-2xl">
+      <Sheet open={isDetailsOpen} onOpenChange={(open) => {
+        setIsDetailsOpen(open);
+        if (!open) setIsMaximized(false);
+      }}>
+        <SheetContent className={cn(
+          "w-full p-0 border-l-slate-200 shadow-2xl transition-all duration-500 ease-in-out",
+          isMaximized ? "sm:max-w-[100vw]" : "sm:max-w-[85vw]"
+        )}>
           {selectedProject && (
             <ProjectDetails 
               project={selectedProject} 
               onClose={() => setIsDetailsOpen(false)} 
               onUpdate={fetchProjects}
+              isMaximized={isMaximized}
+              onToggleMaximize={() => setIsMaximized(!isMaximized)}
             />
           )}
         </SheetContent>

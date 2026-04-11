@@ -20,7 +20,7 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const [selectedProjectName, setSelectedProjectName] = useState<string>('all');
 
   useEffect(() => {
     if (user) {
@@ -77,9 +77,9 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
     }
   };
 
-  const filteredEvents = selectedProjectId === 'all' 
+  const filteredEvents = selectedProjectName === 'all' 
     ? events 
-    : events.filter(e => e.project_id === selectedProjectId);
+    : events.filter(e => e.project_name === selectedProjectName);
 
   const handleEventClick = (event: any) => {
     const project = projects.find(p => p.id === event.project_id);
@@ -104,14 +104,14 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
             <Filter className="w-4 h-4 text-slate-400" />
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+            <Select value={selectedProjectName} onValueChange={setSelectedProjectName}>
               <SelectTrigger className="w-[200px] border-none shadow-none h-8 p-0 focus:ring-0 text-xs font-bold">
                 <SelectValue placeholder={t('filter_by_project')} />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="all">{t('all_projects')}</SelectItem>
                 {projects.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -119,12 +119,16 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
 
           <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-              Showing {filteredEvents.length} events
+              {t('showing')} {filteredEvents.length} {t('events')}
             </p>
           </div>
         </div>
       </div>
-      <CalendarView events={filteredEvents} onEventClick={handleEventClick} />
+      <CalendarView 
+        events={filteredEvents} 
+        onEventClick={handleEventClick} 
+        selectedProjectName={selectedProjectName}
+      />
     </div>
   );
 };

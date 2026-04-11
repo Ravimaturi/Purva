@@ -52,7 +52,7 @@ import { cn, getInitials } from '../lib/utils';
 
 export const TeamManagement: React.FC = () => {
   const { user: currentUser } = useUser();
-  const { t } = useLanguage();
+  const { t, translateData } = useLanguage();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -194,6 +194,9 @@ export const TeamManagement: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('team')}</h2>
+      </div>
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1 max-w-md">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -252,7 +255,7 @@ export const TeamManagement: React.FC = () => {
                     <DropdownMenuContent align="start" className="rounded-xl">
                       {uniqueDesignations.map(d => (
                         <DropdownMenuItem key={d} onClick={() => setDesignationFilter(d)}>
-                          {d}
+                          {d === 'All' ? 'All' : translateData(d)}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -306,7 +309,7 @@ export const TeamManagement: React.FC = () => {
                       <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">{getInitials(u.full_name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900">{u.full_name}</span>
+                      <span className="font-bold text-slate-900">{translateData(u.full_name)}</span>
                       {u.id === currentUser?.id && (
                         <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-tighter">You</span>
                       )}
@@ -317,7 +320,7 @@ export const TeamManagement: React.FC = () => {
                   {u.emp_code || 'N/A'}
                 </TableCell>
                 <TableCell className="text-sm text-slate-500 font-medium italic">
-                  {u.designation || 'N/A'}
+                  {u.designation ? translateData(u.designation) : 'N/A'}
                 </TableCell>
                 <TableCell className="text-sm text-slate-500 font-medium">
                   <div className="flex items-center gap-2">

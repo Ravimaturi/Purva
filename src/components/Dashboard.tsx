@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -42,11 +43,12 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
   const { user } = useUser();
-  const { t } = useLanguage();
+  const { t, translateData } = useLanguage();
 
   useEffect(() => {
     fetchProjects();
@@ -232,7 +234,7 @@ export const Dashboard: React.FC = () => {
   ];
 
   const stageData = PROJECT_STAGES.map(stage => ({
-    name: STAGE_LABELS[stage],
+    name: t(stage.toLowerCase().replace(/ /g, '_')),
     count: projects.filter(p => p.status === stage).length
   }));
 
@@ -244,39 +246,29 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('revenue_overview')}</h1>
-          <p className="text-slate-500 text-sm sm:text-base">Welcome back, <span className="text-indigo-600 font-semibold">{user?.full_name}</span>! Here's what's happening.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t('dashboard')}</h1>
+          <p className="text-slate-500 text-sm sm:text-base">
+            Welcome back, <span className="text-indigo-600 font-bold">{user?.full_name}</span>! Here's your project overview.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button 
             variant="outline" 
             size="sm" 
             onClick={seedData}
             disabled={loading}
-            className="rounded-xl border-slate-200 font-bold text-xs uppercase tracking-widest h-10 px-4"
+            className="rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-widest h-10 px-4 hover:bg-slate-50 transition-all"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Seed Sample Data
+            <Plus className="w-3.5 h-3.5 mr-2" />
+            Seed Data
           </Button>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          {filterStatus && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => setFilterStatus(null)}
-              className="text-slate-500 hover:text-indigo-600 font-bold"
-            >
-              Clear Filter: {filterStatus}
-            </Button>
-          )}
           <Button 
-            variant="outline" 
+            variant="default" 
             size="sm"
             onClick={() => setIsNewDialogOpen(true)}
-            className="rounded-xl border-slate-200 bg-white flex-1 sm:flex-none"
+            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-10 px-6 font-bold text-xs"
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('add_project')}
@@ -284,25 +276,41 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {filterStatus && (
+        <div className="flex items-center gap-2 animate-in slide-in-from-left duration-300">
+          <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+            Filtered: {filterStatus}
+          </Badge>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setFilterStatus(null)}
+            className="h-7 text-[10px] font-bold text-slate-400 hover:text-red-500 uppercase tracking-widest"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {stats.map((stat, i) => (
           <Card 
             key={i} 
-            onClick={() => setFilterStatus(stat.label === 'Total Projects' ? null : stat.label)}
+            onClick={() => setFilterStatus(stat.label === t('all_projects') ? null : stat.label)}
             className={cn(
-              "border-none shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer hover:-translate-y-1 active:scale-95",
-              filterStatus === stat.label ? "ring-2 ring-indigo-500 bg-indigo-50/30" : ""
+              "border-none shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1 active:scale-95 group",
+              filterStatus === stat.label ? "ring-2 ring-indigo-500 bg-indigo-50/30" : "bg-white"
             )}
           >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-500 mb-1">{stat.label}</p>
-                  <h3 className="text-3xl font-bold text-slate-900">{stat.value}</h3>
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">{stat.label}</p>
+                  <h3 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter">{stat.value}</h3>
                 </div>
-                <div className={`${stat.bg} p-3 rounded-2xl`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <div className={cn(stat.bg, "p-3 rounded-2xl shrink-0 self-start sm:self-center transition-transform group-hover:scale-110")}>
+                  <stat.icon className={cn("w-5 h-5 sm:w-6 sm:h-6", stat.color)} />
                 </div>
               </div>
             </CardContent>
@@ -319,9 +327,9 @@ export const Dashboard: React.FC = () => {
               {t('project_status')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[400px]">
+          <CardContent className="h-[300px] sm:h-[400px] p-2 sm:p-6">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stageData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+              <BarChart data={stageData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="name" 
@@ -329,29 +337,37 @@ export const Dashboard: React.FC = () => {
                   textAnchor="end" 
                   interval={0} 
                   height={100} 
-                  stroke="#64748b"
-                  fontSize={12}
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  fontWeight={600}
                   tickLine={false}
                   axisLine={false}
                 />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} fontWeight={600} tickLine={false} axisLine={false} />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
                 />
                 <Bar 
                   dataKey="count" 
-                  radius={[6, 6, 0, 0]}
+                  radius={[8, 8, 0, 0]}
                   onClick={(data) => setFilterStatus(data.name)}
                   className="cursor-pointer"
+                  barSize={window.innerWidth < 640 ? 20 : 40}
                 >
                   {stageData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={COLORS[index % COLORS.length]} 
                       className={cn(
-                        "transition-opacity duration-200",
-                        filterStatus && filterStatus !== entry.name ? "opacity-30" : "opacity-100"
+                        "transition-all duration-300 hover:opacity-80",
+                        filterStatus && filterStatus !== entry.name ? "opacity-20" : "opacity-100"
                       )}
                     />
                   ))}
@@ -375,11 +391,11 @@ export const Dashboard: React.FC = () => {
                 </Button>
               )}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-2">
                 {filteredProjects.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 text-sm font-medium">
-                    No projects found for this stage.
+                  <div className="text-center py-12 text-slate-400 text-sm font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    No projects found.
                   </div>
                 ) : (
                   filteredProjects.slice(0, 6).map((project) => (
@@ -389,21 +405,21 @@ export const Dashboard: React.FC = () => {
                         setSelectedProject(project);
                         setIsDetailsOpen(true);
                       }}
-                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-colors group"
+                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-indigo-50/50 cursor-pointer transition-all group border border-transparent hover:border-indigo-100"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                           {project.name.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{project.name}</p>
-                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{STAGE_LABELS[project.status]}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{translateData(project.name)}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-slate-700">{project.progress}%</p>
-                        <div className="w-16 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                          <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
+                      <div className="text-right shrink-0 ml-4">
+                        <p className="text-xs font-black text-slate-900 tracking-tighter">{project.progress}%</p>
+                        <div className="w-12 sm:w-16 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
+                          <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
                         </div>
                       </div>
                     </div>
@@ -420,21 +436,18 @@ export const Dashboard: React.FC = () => {
                 {t('recent_activity')}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-6 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
                 {[1, 2, 3].map((_, i) => (
-                  <div key={i} className="flex gap-4">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-white shadow-sm">
-                        <UsersIcon className="w-5 h-5 text-slate-500" />
-                      </div>
-                      {i !== 2 && <div className="absolute top-10 left-1/2 w-px h-8 bg-slate-100 -translate-x-1/2" />}
+                  <div key={i} className="flex gap-4 relative">
+                    <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-50 flex items-center justify-center shadow-sm shrink-0 z-10 group-hover:border-indigo-100 transition-colors">
+                      <UsersIcon className="w-4 h-4 text-indigo-500" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">
-                        <span className="font-bold">Ravi Teja</span> moved <span className="text-indigo-600">Temple Project</span> to In Progress
+                    <div className="pt-1">
+                      <p className="text-xs sm:text-sm font-medium text-slate-900 leading-relaxed">
+                        <span className="font-bold text-slate-900">{translateData('Mr. Maturi Ravi Teja')}</span> moved <span className="text-indigo-600 font-bold">{translateData('Mahadev Temple Complex')}</span> to <span className="text-slate-500 font-bold">{t('in_progress')}</span>
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">2 hours ago</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">2 hours ago</p>
                     </div>
                   </div>
                 ))}
@@ -450,13 +463,21 @@ export const Dashboard: React.FC = () => {
         onSuccess={fetchProjects} 
       />
 
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent className="sm:max-w-[85vw] w-full p-0 border-l-slate-200 shadow-2xl">
+      <Sheet open={isDetailsOpen} onOpenChange={(open) => {
+        setIsDetailsOpen(open);
+        if (!open) setIsMaximized(false);
+      }}>
+        <SheetContent className={cn(
+          "w-full p-0 border-l-slate-200 shadow-2xl transition-all duration-500 ease-in-out",
+          isMaximized ? "sm:max-w-[100vw]" : "sm:max-w-[85vw]"
+        )}>
           {selectedProject && (
             <ProjectDetails 
               project={selectedProject} 
               onClose={() => setIsDetailsOpen(false)} 
               onUpdate={fetchProjects}
+              isMaximized={isMaximized}
+              onToggleMaximize={() => setIsMaximized(!isMaximized)}
             />
           )}
         </SheetContent>

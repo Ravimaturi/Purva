@@ -5,6 +5,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
+  translateData: (text: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -23,8 +24,23 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return translations[language][key] || translations['en'][key] || key;
   };
 
+  const translateData = (text: string): string => {
+    if (!text) return text;
+    if (language === 'en') return text;
+    
+    // Normalize text for key lookup
+    const key = text.toLowerCase().trim()
+      .replace(/&/g, 'and')
+      .replace(/ /g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+    
+    // Try exact match first, then normalized key
+    if (translations[language][text]) return translations[language][text];
+    return translations[language][key] || text;
+  };
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, translateData }}>
       {children}
     </LanguageContext.Provider>
   );

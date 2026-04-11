@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Task } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 import { cn } from '../lib/utils';
 import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -37,9 +39,11 @@ interface CalendarEvent {
 interface CalendarViewProps {
   events: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
+  selectedProjectName?: string;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ events, onEventClick }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ events, onEventClick, selectedProjectName }) => {
+  const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
@@ -160,70 +164,118 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onEventClick
     return <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-sm">{rows}</div>;
   };
 
-  const renderSelectedDayEvents = () => {
-    const dayEvents = events.filter(event => {
+  const renderRightPanel = () => {
+    const today = new Date();
+    
+    const todayEvents = events.filter(e => e.date && isSameDay(parseISO(e.date), today));
+    const upcomingEvents = events.filter(e => {
+      if (!e.date) return false;
+      const d = parseISO(e.date);
+      return d > today && !isSameDay(d, today);
+    }).sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime()).slice(0, 5);
+
+    const projectEvents = selectedProjectName && selectedProjectName !== 'all'
+      ? events.filter(e => e.project_name === selectedProjectName)
+      : [];
+
+    const selectedDayEvents = events.filter(event => {
       if (!event.date) return false;
       const eventDate = parseISO(event.date);
       return isValid(eventDate) && isSameDay(eventDate, selectedDay);
     });
 
-    return (
-      <div className="mt-8 bg-slate-50 rounded-3xl p-6 border border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
-            Events for {format(selectedDay, 'MMMM d, yyyy')}
-          </h3>
-          <Badge variant="secondary" className="bg-white text-indigo-600 font-bold">
-            {dayEvents.length} Events
+    const Section = ({ title, items, emptyMsg }: { title: string, items: CalendarEvent[], emptyMsg: string }) => (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</h4>
+          <Badge variant="secondary" className="bg-white text-indigo-600 font-bold text-[10px]">
+            {items.length}
           </Badge>
         </div>
-
-        {dayEvents.length === 0 ? (
-          <p className="text-xs text-slate-400 italic py-4 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-            No events scheduled for this day.
+        {items.length === 0 ? (
+          <p className="text-[10px] text-slate-400 italic py-3 text-center bg-white/50 rounded-xl border border-dashed border-slate-200">
+            {emptyMsg}
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {dayEvents.map(event => (
+          <div className="space-y-2">
+            {items.map(event => (
               <div 
                 key={`${event.type}-${event.id}`}
                 onClick={() => onEventClick?.(event)}
                 className={cn(
-                  "p-4 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer group",
+                  "p-3 rounded-xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer group",
                   event.type === 'project' ? "border-amber-100" : "border-indigo-100"
                 )}
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center justify-between mb-1">
                   <Badge className={cn(
-                    "text-[8px] font-black uppercase tracking-tighter",
+                    "text-[7px] font-black uppercase tracking-tighter px-1 py-0",
                     event.type === 'project' ? "bg-amber-500" : "bg-indigo-500"
                   )}>
                     {event.type}
                   </Badge>
-                  {event.status && (
-                    <Badge variant="outline" className="text-[8px] font-bold uppercase tracking-widest border-slate-200">
-                      {event.status}
-                    </Badge>
-                  )}
+                  <span className="text-[8px] font-bold text-slate-400">
+                    {event.date ? format(parseISO(event.date), 'MMM d') : ''}
+                  </span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{event.title}</h4>
-                {event.project_name && (
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Project: {event.project_name}</p>
-                )}
+                <h5 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">{event.title}</h5>
               </div>
             ))}
           </div>
         )}
       </div>
     );
+
+    return (
+      <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 h-full flex flex-col gap-8 overflow-y-auto max-h-[800px] no-scrollbar">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
+            {format(selectedDay, 'MMMM d, yyyy')}
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Selected Date Overview</p>
+        </div>
+
+        <Section 
+          title="Selected Day" 
+          items={selectedDayEvents} 
+          emptyMsg="No events for this day" 
+        />
+
+        <Separator className="bg-slate-200/50" />
+
+        <Section 
+          title="Today's Tasks" 
+          items={todayEvents} 
+          emptyMsg="No tasks for today" 
+        />
+
+        <Section 
+          title="Upcoming" 
+          items={upcomingEvents} 
+          emptyMsg="No upcoming tasks" 
+        />
+
+        {selectedProjectName && selectedProjectName !== 'all' && (
+          <Section 
+            title={`Tasks in ${selectedProjectName}`} 
+            items={projectEvents} 
+            emptyMsg="No tasks in this project" 
+          />
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="bg-white rounded-3xl p-4 sm:p-6">
-      {renderHeader()}
-      {renderDays()}
-      {renderCells()}
-      {renderSelectedDayEvents()}
+    <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex-1 bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100">
+        {renderHeader()}
+        {renderDays()}
+        {renderCells()}
+      </div>
+      <div className="w-full lg:w-96 shrink-0">
+        {renderRightPanel()}
+      </div>
     </div>
   );
 };

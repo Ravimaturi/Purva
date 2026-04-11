@@ -11,11 +11,20 @@ import {
   AlertCircle, 
   Loader2,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Filter
 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from './ui/select';
 import {
   DndContext,
   closestCorners,
@@ -42,6 +51,7 @@ interface SortableProjectCardProps {
 }
 
 const SortableProjectCard: React.FC<SortableProjectCardProps> = ({ project, onClick }) => {
+  const { translateData } = useLanguage();
   const {
     attributes,
     listeners,
@@ -66,9 +76,9 @@ const SortableProjectCard: React.FC<SortableProjectCardProps> = ({ project, onCl
       onClick={() => onClick(project)}
       className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all group cursor-grab active:cursor-grabbing"
     >
-      <h4 className="text-sm font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">{project.name}</h4>
+      <h4 className="text-sm font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">{translateData(project.name)}</h4>
       <p className="text-[10px] font-medium text-slate-500 line-clamp-2 mb-3 leading-relaxed">
-        {project.description || 'No description provided.'}
+        {translateData(project.description || 'No description provided.')}
       </p>
       
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
@@ -77,7 +87,7 @@ const SortableProjectCard: React.FC<SortableProjectCardProps> = ({ project, onCl
             <User className="w-3 h-3 text-slate-500" />
           </div>
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate max-w-[80px]">
-            {project.assigned_to}
+            {translateData(project.assigned_to)}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -111,6 +121,7 @@ interface KanbanColumnProps {
 }
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, projects, onProjectClick }) => {
+  const { t, translateData } = useLanguage();
   const { setNodeRef, isOver } = useDroppable({
     id: stage,
   });
@@ -118,22 +129,24 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, projects, onProjectC
   const stageProjects = projects.filter(p => p.status === stage);
 
   return (
-    <div className="flex flex-col gap-4 min-w-[300px] w-[300px]">
-      <div className={cn(
-        "flex items-center justify-between p-3 rounded-xl font-bold text-[10px] uppercase tracking-widest border transition-colors",
-        isOver ? "bg-indigo-100 border-indigo-300 text-indigo-800" :
-        STAGE_LABELS[stage] === 'Handover' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-        STAGE_LABELS[stage] === 'In Progress' ? "bg-amber-50 text-amber-700 border-amber-100" :
-        STAGE_LABELS[stage] === 'On Hold' ? "bg-red-50 text-red-700 border-red-100" :
-        STAGE_LABELS[stage] === 'Design & Prep' ? "bg-blue-50 text-blue-700 border-blue-100" :
-        "bg-slate-50 text-slate-600 border-slate-100"
-      )}>
+    <div className="flex flex-col gap-4 w-80 min-w-[320px]">
+      <div 
+        className={cn(
+          "flex items-center justify-between p-3 rounded-xl font-bold text-[10px] uppercase tracking-widest border transition-colors",
+          isOver ? "bg-indigo-100 border-indigo-300 text-indigo-800" :
+          STAGE_LABELS[stage] === 'Handover' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+          STAGE_LABELS[stage] === 'In Progress' ? "bg-amber-50 text-amber-700 border-amber-100" :
+          STAGE_LABELS[stage] === 'On Hold' ? "bg-red-50 text-red-700 border-red-100" :
+          STAGE_LABELS[stage] === 'Design & Prep' ? "bg-blue-50 text-blue-700 border-blue-100" :
+          "bg-slate-50 text-slate-600 border-slate-100"
+        )}
+      >
         <div className="flex items-center gap-2">
           {STAGE_LABELS[stage] === 'Handover' ? <CheckCircle2 className="w-3.5 h-3.5" /> : 
            STAGE_LABELS[stage] === 'In Progress' ? <Clock className="w-3.5 h-3.5" /> : 
            STAGE_LABELS[stage] === 'On Hold' ? <AlertCircle className="w-3.5 h-3.5" /> :
            <AlertCircle className="w-3.5 h-3.5" />}
-          {STAGE_LABELS[stage]}
+          {translateData(stage)}
         </div>
         <span className="bg-white/50 px-2 py-0.5 rounded-full">
           {stageProjects.length}
@@ -172,10 +185,12 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, projects, onProjectC
 
 export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> = ({ onProjectClick }) => {
   const { user } = useUser();
+  const { t, translateData } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [originalStatus, setOriginalStatus] = useState<ProjectStatus | null>(null);
+  const [selectedStage, setSelectedStage] = useState<string>('all');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -284,6 +299,10 @@ export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> =
     setOriginalStatus(null);
   };
 
+  const filteredStages = selectedStage === 'all' 
+    ? PROJECT_STAGES 
+    : PROJECT_STAGES.filter(s => s === selectedStage);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -294,12 +313,30 @@ export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> =
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Project Status Kanban</h2>
-        <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-            Drag projects between stages to update status
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('project_status')}</h2>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <Select value={selectedStage} onValueChange={setSelectedStage}>
+              <SelectTrigger className="w-[200px] border-none shadow-none h-8 p-0 focus:ring-0 text-xs font-bold">
+                <SelectValue placeholder="Filter by Stage" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">All Stages</SelectItem>
+                {PROJECT_STAGES.map(stage => (
+                  <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              {t('drag_projects_hint')}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -311,7 +348,7 @@ export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> =
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-6 overflow-x-auto pb-6 min-h-[600px]">
-          {PROJECT_STAGES.map((stage) => (
+          {filteredStages.map((stage) => (
             <KanbanColumn 
               key={stage} 
               stage={stage} 

@@ -14,15 +14,18 @@ import { Toaster } from './components/ui/sonner';
 import { Sheet, SheetContent } from './components/ui/sheet';
 import { ProjectDetails } from './components/ProjectDetails';
 import { Project } from './types';
+import { cn } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
     setIsDetailsOpen(true);
+    setIsMaximized(false);
   };
 
   const renderContent = () => {
@@ -54,12 +57,23 @@ export default function App() {
             {renderContent()}
           </Layout>
           
-          <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-            <SheetContent className="sm:max-w-[85vw] w-full p-0 border-l-slate-200 shadow-2xl">
+          <Sheet open={isDetailsOpen} onOpenChange={(open) => {
+            setIsDetailsOpen(open);
+            if (!open) setIsMaximized(false);
+          }}>
+            <SheetContent 
+              side="right"
+              className={cn(
+                "p-0 border-l-slate-200 shadow-2xl transition-all duration-500 ease-in-out !max-w-none",
+                isMaximized ? "!w-full !inset-0 !h-full" : "w-full sm:max-w-[85vw]"
+              )}
+            >
               {selectedProject && (
                 <ProjectDetails 
                   project={selectedProject} 
                   onClose={() => setIsDetailsOpen(false)} 
+                  isMaximized={isMaximized}
+                  onToggleMaximize={() => setIsMaximized(!isMaximized)}
                   onUpdate={() => {
                     // Refresh data if needed
                   }}

@@ -133,32 +133,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </button>
         ))}
       </nav>
-
-      <div className="p-4 border-t border-slate-100 flex items-center gap-2">
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className="flex-1 flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 transition-all text-left outline-none border border-transparent hover:border-slate-200 group"
-        >
-          <Avatar className="h-9 w-9 border-2 border-white shadow-sm group-hover:shadow-md transition-shadow">
-            <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">{getInitials(user?.full_name || '')}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-bold text-slate-900 truncate">{user?.full_name}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.role}</p>
-          </div>
-        </button>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger 
-            render={
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-600">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            }
-          />
-          <UserMenuContent />
-        </DropdownMenu>
-      </div>
     </div>
   );
 
@@ -170,7 +144,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col">
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
@@ -320,6 +294,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Profile Button in Header */}
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100">
+              <DropdownMenu>
+                <DropdownMenuTrigger 
+                  render={
+                    <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-10 rounded-xl hover:bg-slate-50 transition-all">
+                      <Avatar className="h-8 w-8 border border-slate-200">
+                        <AvatarFallback className="bg-indigo-600 text-white font-bold text-[10px]">{getInitials(user?.full_name || '')}</AvatarFallback>
+                      </Avatar>
+                      <div className="hidden md:flex flex-col items-start text-left">
+                        <p className="text-xs font-bold text-slate-900 leading-none">{user?.full_name}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role}</p>
+                      </div>
+                    </Button>
+                  }
+                />
+                <UserMenuContent />
+              </DropdownMenu>
+            </div>
             
             {/* Mobile User Avatar */}
             <div className="lg:hidden">
@@ -340,7 +334,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+        <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
           {children}
         </div>
       </main>
