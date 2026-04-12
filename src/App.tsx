@@ -10,6 +10,7 @@ import { GlobalCalendar } from './components/GlobalCalendar';
 import { ProjectList } from './components/ProjectList';
 import { TeamManagement } from './components/TeamManagement';
 import { Profile } from './components/Profile';
+import { VendorManagement } from './components/VendorManagement';
 import { Toaster } from './components/ui/sonner';
 import { Sheet, SheetContent } from './components/ui/sheet';
 import { ProjectDetails } from './components/ProjectDetails';
@@ -21,9 +22,11 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [projectDetailsTab, setProjectDetailsTab] = useState('activity');
 
-  const handleProjectClick = (project: Project) => {
+  const handleProjectClick = (project: Project, tab?: string) => {
     setSelectedProject(project);
+    setProjectDetailsTab(tab || 'activity');
     setIsDetailsOpen(true);
     setIsMaximized(false);
   };
@@ -33,7 +36,9 @@ export default function App() {
       case 'dashboard':
         return <Dashboard />;
       case 'projects':
-        return <ProjectList />;
+        return <ProjectList onProjectClick={handleProjectClick} />;
+      case 'my-projects':
+        return <ProjectList employeeView={true} onProjectClick={handleProjectClick} />;
       case 'project-kanban':
         return <ProjectKanban onProjectClick={handleProjectClick} />;
       case 'kanban':
@@ -42,6 +47,8 @@ export default function App() {
         return <GlobalCalendar onProjectClick={handleProjectClick} />;
       case 'team':
         return <TeamManagement />;
+      case 'vendors':
+        return <VendorManagement onProjectClick={handleProjectClick} />;
       case 'profile':
         return <Profile />;
       default:
@@ -74,6 +81,7 @@ export default function App() {
                   onClose={() => setIsDetailsOpen(false)} 
                   isMaximized={isMaximized}
                   onToggleMaximize={() => setIsMaximized(!isMaximized)}
+                  initialTab={projectDetailsTab}
                   onUpdate={() => {
                     // Refresh data if needed
                   }}

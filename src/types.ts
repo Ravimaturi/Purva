@@ -1,6 +1,5 @@
 export type ProjectStatus = 
   | 'Discussion' 
-  | 'Proposal Sent' 
   | 'Advance Received' 
   | 'Construction' 
   | 'Work is on hold' 
@@ -66,6 +65,13 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface TransactionComment {
+  id: string;
+  text: string;
+  author: string;
+  date: string;
+}
+
 export interface PaymentStage {
   id: string;
   project_id: string;
@@ -75,4 +81,30 @@ export interface PaymentStage {
   status: 'Pending' | 'Paid' | 'Overdue';
   due_date: string | null;
   received_date: string | null;
+  comments?: string; // JSON string of TransactionComment[]
+}
+
+export interface Vendor {
+  id: string;
+  vendor_name: string;
+  contact_person_name: string;
+  phone_no: string;
+  pan_card_no: string;
+  gst_no: string;
+  services_list: string;
+  created_at: string;
+}
+
+export interface VendorOrder {
+  id: string;
+  project_id: string;
+  vendor_id: string;
+  order_date: string;
+  order_details: string;
+  terms: string;
+  total_amount: number;
+  amount_paid: number;
+  status: 'Pending' | 'In Progress' | 'Completed';
+  comments: string;
+  created_at: string;
 }

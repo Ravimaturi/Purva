@@ -1,0 +1,268 @@
+import React, { useState, useEffect } from 'react';
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { Vendor, VendorOrder, Project } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
+import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Badge } from './ui/badge';
+import { supabase } from '../lib/supabase';
+
+interface VendorManagementProps {
+  onProjectClick?: (project: Project, tab?: string) => void;
+}
+
+export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectClick }) => {
+  const { t } = useLanguage();
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [orders, setOrders] = useState<VendorOrder[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [projectsRes, vendorsRes, ordersRes] = await Promise.all([
+        supabase.from('projects').select('*'),
+        supabase.from('vendors').select('*').order('created_at', { ascending: false }),
+        supabase.from('vendor_orders').select('*')
+      ]);
+      
+      if (projectsRes.data) setProjects(projectsRes.data);
+      if (vendorsRes.data) setVendors(vendorsRes.data);
+      if (ordersRes.data) setOrders(ordersRes.data);
+    };
+    fetchData();
+  }, []);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+  
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newContactPersonName, setNewContactPersonName] = useState('');
+  const [newPhoneNo, setNewPhoneNo] = useState('');
+  const [newPanCardNo, setNewPanCardNo] = useState('');
+  const [newGstNo, setNewGstNo] = useState('');
+  const [newServicesList, setNewServicesList] = useState('');
+
+  const handleAddVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newVendor = {
+      vendor_name: newVendorName,
+      contact_person_name: newContactPersonName,
+      phone_no: newPhoneNo,
+      pan_card_no: newPanCardNo,
+      gst_no: newGstNo,
+      services_list: newServicesList,
+    };
+    
+    const { data, error } = await supabase.from('vendors').insert([newVendor]).select();
+    
+    if (error) {
+      console.error('Error adding vendor:', error);
+      return;
+    }
+
+    if (data && data[0]) {
+      setVendors([data[0], ...vendors]);
+      setIsAddVendorOpen(false);
+      setNewVendorName('');
+      setNewContactPersonName('');
+      setNewPhoneNo('');
+      setNewPanCardNo('');
+      setNewGstNo('');
+      setNewServicesList('');
+    }
+  };
+
+  const filteredVendors = vendors.filter(v => 
+    v.vendor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.services_list?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Vendor Management</h2>
+        <div className="flex items-center gap-4">
+          <div className="relative w-full sm:w-64 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <Input 
+              placeholder="Search vendors..." 
+              className="pl-10 bg-white border-slate-200 rounded-2xl h-11"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Button 
+            onClick={() => setIsAddVendorOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Vendor
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredVendors.map(vendor => {
+          const vendorOrders = orders.filter(o => o.vendor_id === vendor.id);
+          const totalSpent = vendorOrders.reduce((sum, o) => sum + o.amount_paid, 0);
+          const totalCommitted = vendorOrders.reduce((sum, o) => sum + o.total_amount, 0);
+
+          return (
+            <div key={vendor.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-lg">{vendor.vendor_name}</h3>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{vendor.services_list}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Phone className="w-4 h-4 text-slate-400" />
+                  {vendor.phone_no} {vendor.contact_person_name ? `(${vendor.contact_person_name})` : ''}
+                </div>
+                {(vendor.pan_card_no || vendor.gst_no) && (
+                  <div className="flex flex-col gap-1 text-xs text-slate-500">
+                    {vendor.pan_card_no && <span>PAN: <span className="font-mono text-slate-700">{vendor.pan_card_no}</span></span>}
+                    {vendor.gst_no && <span>GST: <span className="font-mono text-slate-700">{vendor.gst_no}</span></span>}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Briefcase className="w-4 h-4 text-slate-400" />
+                  {vendorOrders.length} Orders
+                </div>
+              </div>
+
+              {vendorOrders.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Projects</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(new Set(vendorOrders.map(o => o.project_id))).map(projectId => {
+                      const project = projects.find(p => p.id === projectId);
+                      if (!project) return null;
+                      return (
+                        <Badge 
+                          key={projectId} 
+                          variant="secondary" 
+                          className="bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 cursor-pointer transition-colors flex items-center gap-1"
+                          onClick={() => onProjectClick?.(project, 'vendors')}
+                        >
+                          {project.name}
+                          <ExternalLink className="w-3 h-3 opacity-50" />
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Committed</p>
+                  <p className="font-bold text-slate-900">₹{totalCommitted.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Paid</p>
+                  <p className="font-bold text-emerald-600">₹{totalSpent.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filteredVendors.length === 0 && (
+          <div className="col-span-full text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+            <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-lg font-bold text-slate-900">No vendors found</p>
+            <p className="text-sm text-slate-500 mt-1">Add your first vendor to start tracking orders.</p>
+          </div>
+        )}
+      </div>
+
+      <Dialog open={isAddVendorOpen} onOpenChange={setIsAddVendorOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Vendor</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddVendor} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Vendor Name</label>
+              <Input 
+                required
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                className="rounded-xl"
+                placeholder="e.g. ABC Construction Supplies"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Contact Person</label>
+                <Input 
+                  value={newContactPersonName}
+                  onChange={(e) => setNewContactPersonName(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Phone No.</label>
+                <Input 
+                  required
+                  value={newPhoneNo}
+                  onChange={(e) => setNewPhoneNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Phone Number"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">PAN Card No.</label>
+                <Input 
+                  value={newPanCardNo}
+                  onChange={(e) => setNewPanCardNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="PAN"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">GST No.</label>
+                <Input 
+                  value={newGstNo}
+                  onChange={(e) => setNewGstNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="GSTIN"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Services / Goods Provided</label>
+              <Input 
+                required
+                value={newServicesList}
+                onChange={(e) => setNewServicesList(e.target.value)}
+                className="rounded-xl"
+                placeholder="e.g. Cement, Steel, Labor"
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setIsAddVendorOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button type="submit" className="bg-indigo-600 rounded-xl">Add Vendor</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};

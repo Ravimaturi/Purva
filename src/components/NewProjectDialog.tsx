@@ -20,6 +20,7 @@ import {
 import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface NewProjectDialogProps {
   open: boolean;
@@ -28,9 +29,12 @@ interface NewProjectDialogProps {
 }
 
 import { useNotifications } from '../contexts/NotificationContext';
+import { useUser } from '../contexts/UserContext';
 
 export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpenChange, onSuccess }) => {
   const { addNotification } = useNotifications();
+  const { user, allUsers } = useUser();
+  const { translateData } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -77,7 +81,19 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
         }
       }
 
-      await addNotification('New Project Created', `Project "${formData.name}" has been created by an employee.`);
+      await addNotification('New Project Created', `Project "${formData.name}" has been created by ${user?.full_name || 'an employee'}.`);
+      
+      // Notify assignee
+      if (formData.assigned_to && user && formData.assigned_to !== user.full_name) {
+        const assignee = allUsers.find(u => u.full_name === formData.assigned_to || u.id === formData.assigned_to);
+        if (assignee && assignee.id !== user.id) {
+          await addNotification(
+            'New Project Assigned',
+            `${user.full_name} assigned you to a new project: "${formData.name}"`,
+            assignee.id
+          );
+        }
+      }
       
       toast.success('Project created successfully with initial tasks');
       onSuccess();
@@ -139,7 +155,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   {PROJECT_STAGES.map(stage => (
-                    <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                    <SelectItem key={stage} value={stage}>{translateData(STAGE_LABELS[stage])}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

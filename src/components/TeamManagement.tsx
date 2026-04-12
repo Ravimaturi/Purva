@@ -282,7 +282,7 @@ export const TeamManagement: React.FC = () => {
                     <DropdownMenuContent align="start" className="rounded-xl">
                       {uniqueRoles.map(r => (
                         <DropdownMenuItem key={r} onClick={() => setRoleFilter(r)}>
-                          {r}
+                          {r.toUpperCase()}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -333,12 +333,12 @@ export const TeamManagement: React.FC = () => {
                     {u.role === 'admin' ? (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100">
                         <Shield className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Admin</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">ADMIN</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full border border-slate-100">
                         <UserIcon className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Employee</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">EMPLOYEE</span>
                       </div>
                     )}
                   </div>

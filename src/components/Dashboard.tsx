@@ -1,35 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie
-} from 'recharts';
-import { 
   Briefcase, 
   CheckCircle2, 
   Clock, 
   AlertCircle,
-  TrendingUp,
-  Users as UsersIcon,
   Plus,
   HardHat,
-  MessageSquare,
-  ClipboardList
+  MessageSquare
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Project } from '../types';
+import { Project, PaymentStage, VendorOrder } from '../types';
 import { PROJECT_STAGES, USERS, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -40,6 +25,8 @@ import { Sheet, SheetContent } from './ui/sheet';
 
 export const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
+  const [vendorOrders, setVendorOrders] = useState<VendorOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -56,12 +43,16 @@ export const Dashboard: React.FC = () => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*');
+      const [projectsRes, paymentsRes, vendorsRes] = await Promise.all([
+        supabase.from('projects').select('*'),
+        supabase.from('payment_stages').select('*'),
+        supabase.from('vendor_orders').select('*')
+      ]);
       
-      if (error) throw error;
-      setProjects(data || []);
+      if (projectsRes.error) throw projectsRes.error;
+      setProjects(projectsRes.data || []);
+      setPaymentStages(paymentsRes.data || []);
+      setVendorOrders(vendorsRes.data || []);
     } catch (err) {
       console.error('Error fetching projects:', err);
     } finally {
@@ -72,14 +63,56 @@ export const Dashboard: React.FC = () => {
   const seedData = async () => {
     setLoading(true);
     try {
-      // 1. Seed profiles if they don't exist
-      const { data: existingProfiles } = await supabase.from('profiles').select('id').limit(1);
-      if (!existingProfiles || existingProfiles.length === 0) {
-        const { error: uError } = await supabase.from('profiles').insert(USERS);
-        if (uError) console.error('Error seeding profiles:', uError);
-      }
+      // 0. Clear existing data to start fresh
+      await Promise.all([
+        supabase.from('notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('comments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('vendor_orders').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('vendors').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      ]);
 
-      // 2. Sample Projects
+      // 1. Upsert profiles to ensure names are updated
+      const { error: uError } = await supabase.from('profiles').upsert(USERS, { onConflict: 'id' });
+      if (uError) console.error('Error seeding profiles:', uError);
+
+      // 2. Sample Vendors
+      const sampleVendors = [
+        {
+          vendor_name: 'Sri Ram Stones & Granites',
+          contact_person_name: 'Ramesh Babu',
+          phone_no: '+91 98765 43210',
+          pan_card_no: 'ABCDE1234F',
+          gst_no: '29ABCDE1234F1Z5',
+          services_list: 'Granite, Marble, Carved Stones',
+        },
+        {
+          vendor_name: 'Viswakarma Woodworks',
+          contact_person_name: 'Karthik Achari',
+          phone_no: '+91 87654 32109',
+          pan_card_no: 'VWXYZ5678G',
+          gst_no: '33VWXYZ5678G1Z2',
+          services_list: 'Teak Wood, Carved Doors, Pillars',
+        },
+        {
+          vendor_name: 'Maha Cement Suppliers',
+          contact_person_name: 'Suresh Kumar',
+          phone_no: '+91 76543 21098',
+          pan_card_no: 'PQRST9012H',
+          gst_no: '36PQRST9012H1Z8',
+          services_list: 'Cement, Sand, Bricks',
+        }
+      ];
+
+      const { data: insertedVendors, error: vError } = await supabase
+        .from('vendors')
+        .insert(sampleVendors)
+        .select();
+
+      if (vError) throw vError;
+
+      // 3. Sample Projects
       const sampleProjects = [
         {
           name: 'Mahadev Temple Complex',
@@ -88,7 +121,7 @@ export const Dashboard: React.FC = () => {
           status: 'Construction',
           progress: 45,
           deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'Mr. Maturi Ravi Teja',
+          assigned_to: 'M Ravi Teja',
           last_updated: new Date().toISOString()
         },
         {
@@ -98,7 +131,7 @@ export const Dashboard: React.FC = () => {
           status: 'Advance Received',
           progress: 20,
           deadline: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'Mr. Daggupati Naga Vara Prasad',
+          assigned_to: 'DNV Prasad Sthapathy',
           last_updated: new Date().toISOString()
         },
         {
@@ -108,7 +141,7 @@ export const Dashboard: React.FC = () => {
           status: 'Discussion',
           progress: 10,
           deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'Mr. Gandeti Siva Krishna',
+          assigned_to: 'G Siva Krishna Sthapathy',
           last_updated: new Date().toISOString()
         },
         {
@@ -118,7 +151,7 @@ export const Dashboard: React.FC = () => {
           status: 'Work is on hold',
           progress: 35,
           deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'Mr. Modukuri Dyanesh Kumar',
+          assigned_to: 'M Dyanesh Kumar',
           last_updated: new Date().toISOString()
         },
         {
@@ -129,7 +162,7 @@ export const Dashboard: React.FC = () => {
           progress: 100,
           deadline: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
           completed_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'Mr. Uriti Vishnu',
+          assigned_to: 'U Vishnu',
           last_updated: new Date().toISOString()
         }
       ];
@@ -145,14 +178,14 @@ export const Dashboard: React.FC = () => {
         const project1 = insertedProjects[0];
         const project2 = insertedProjects[1];
 
-        // 3. Sample Tasks
+        // 4. Sample Tasks
         const sampleTasks = [
           {
             project_id: project1.id,
             title: 'Foundation Stone Laying Ceremony',
             status: 'Completed',
             priority: 'High',
-            assigned_to: 'Mr. Maturi Ravi Teja',
+            assigned_to: 'M Ravi Teja',
             deadline: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
             completed_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
           },
@@ -161,7 +194,7 @@ export const Dashboard: React.FC = () => {
             title: 'Main Pillar Carving - Phase 1',
             status: 'In Progress',
             priority: 'High',
-            assigned_to: 'Mr. Gandeti Siva Krishna',
+            assigned_to: 'G Siva Krishna Sthapathy',
             deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
@@ -169,7 +202,7 @@ export const Dashboard: React.FC = () => {
             title: 'Procurement of Granite Stones',
             status: 'Todo',
             priority: 'Medium',
-            assigned_to: 'Mr. Modukuri Dyanesh Kumar',
+            assigned_to: 'M Dyanesh Kumar',
             deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
@@ -177,7 +210,7 @@ export const Dashboard: React.FC = () => {
             title: 'Drafting Initial Floor Plans',
             status: 'In Progress',
             priority: 'High',
-            assigned_to: 'Mr. Daggupati Naga Vara Prasad',
+            assigned_to: 'DNV Prasad Sthapathy',
             deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
@@ -185,7 +218,7 @@ export const Dashboard: React.FC = () => {
             title: '3D Visualization of Main Hall',
             status: 'Todo',
             priority: 'Medium',
-            assigned_to: 'Mr. Uriti Vishnu',
+            assigned_to: 'U Vishnu',
             deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString()
           }
         ];
@@ -193,19 +226,64 @@ export const Dashboard: React.FC = () => {
         const { error: tError } = await supabase.from('tasks').insert(sampleTasks);
         if (tError) console.error('Error seeding tasks:', tError);
 
-        // 4. Sample Comments
+        // 5. Sample Vendor Orders
+        if (insertedVendors && insertedVendors.length > 0) {
+          const vendor1 = insertedVendors[0];
+          const vendor2 = insertedVendors[1];
+
+          const sampleVendorOrders = [
+            {
+              project_id: project1.id,
+              vendor_id: vendor1.id,
+              order_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              order_details: 'Black Granite for Main Sanctum Base',
+              terms: '50% advance, 50% on delivery',
+              total_amount: 500000,
+              amount_paid: 250000,
+              status: 'In Progress',
+              comments: 'First batch expected next week.'
+            },
+            {
+              project_id: project1.id,
+              vendor_id: vendor2.id,
+              order_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              order_details: 'Teak Wood for Main Doors',
+              terms: '100% advance',
+              total_amount: 150000,
+              amount_paid: 150000,
+              status: 'Completed',
+              comments: 'Wood quality verified by Sthapathy.'
+            },
+            {
+              project_id: project2.id,
+              vendor_id: vendor1.id,
+              order_date: new Date().toISOString().split('T')[0],
+              order_details: 'Marble Flooring Tiles',
+              terms: '30 days credit',
+              total_amount: 300000,
+              amount_paid: 0,
+              status: 'Pending',
+              comments: 'Awaiting final design approval before dispatch.'
+            }
+          ];
+
+          const { error: voError } = await supabase.from('vendor_orders').insert(sampleVendorOrders);
+          if (voError) console.error('Error seeding vendor orders:', voError);
+        }
+
+        // 6. Sample Comments with Mentions
         const sampleComments = [
           {
             project_id: project1.id,
-            author: 'Mr. Maturi Ravi Teja',
-            text: 'The foundation work is progressing well. We need to ensure the stone quality is consistent.',
+            author: 'M Dyanesh Kumar',
+            text: `@[G Siva Krishna Sthapathy] please take care of the structural drawings for the main sanctum.`,
             type: 'internal',
             created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
             project_id: project1.id,
-            author: 'Mr. Gandeti Siva Krishna',
-            text: 'Agreed. I have inspected the latest batch of stones and they look excellent.',
+            author: 'G Siva Krishna Sthapathy',
+            text: `@[M Ravi Teja] I have inspected the latest batch of stones and they look excellent.`,
             type: 'internal',
             created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
           }
@@ -213,14 +291,35 @@ export const Dashboard: React.FC = () => {
 
         const { error: cError } = await supabase.from('comments').insert(sampleComments);
         if (cError) console.error('Error seeding comments:', cError);
+
+        // 7. Sample Notifications for Mentions
+        const sampleNotifications = [
+          {
+            user_id: USERS.find(u => u.full_name === 'G Siva Krishna Sthapathy')?.id,
+            title: 'You were tagged',
+            message: `M Dyanesh Kumar tagged you in a comment on project "${project1.name}"`,
+            read: false,
+            created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            user_id: USERS.find(u => u.full_name === 'M Ravi Teja')?.id,
+            title: 'You were tagged',
+            message: `G Siva Krishna Sthapathy tagged you in a comment on project "${project1.name}"`,
+            read: false,
+            created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ].filter(n => n.user_id);
+
+        const { error: nError } = await supabase.from('notifications').insert(sampleNotifications);
+        if (nError) console.error('Error seeding notifications:', nError);
       }
 
-      toast.success('Sample data seeded successfully!');
+      toast.success('Sample data updated successfully!');
       fetchProjects();
     } catch (err: any) {
       console.error('Error seeding data:', err);
       const errorMessage = err.message || 'Unknown error';
-      toast.error(`Failed to seed data: ${errorMessage}`);
+      toast.error(`Failed to update sample data: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -228,17 +327,12 @@ export const Dashboard: React.FC = () => {
 
   const stats = [
     { label: t('all_projects'), value: projects.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: t('pre_contract'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Pre-Contract').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: t('in_progress'), value: projects.filter(p => STAGE_LABELS[p.status] === 'In Progress').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: t('handover'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Handover').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: t('discussion'), value: projects.filter(p => p.status === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: t('design_and_prep'), value: projects.filter(p => p.status === 'Advance Received').length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: t('in_progress'), value: projects.filter(p => p.status === 'Construction').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: t('on_hold'), value: projects.filter(p => p.status === 'Work is on hold').length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: t('handover'), value: projects.filter(p => p.status === 'Completed').length, icon: CheckCircle2, color: 'text-slate-600', bg: 'bg-slate-50' },
   ];
-
-  const stageData = PROJECT_STAGES.map(stage => ({
-    name: t(stage.toLowerCase().replace(/ /g, '_')),
-    count: projects.filter(p => p.status === stage).length
-  }));
-
-  const COLORS = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff', '#f1f5f9', '#f8fafc'];
 
   const filteredProjects = filterStatus 
     ? projects.filter(p => STAGE_LABELS[p.status] === filterStatus || t(p.status.toLowerCase().replace(/ /g, '_')) === filterStatus)
@@ -254,25 +348,29 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={seedData}
-            disabled={loading}
-            className="rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-widest h-10 px-4 hover:bg-slate-50 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5 mr-2" />
-            Seed Data
-          </Button>
-          <Button 
-            variant="default" 
-            size="sm"
-            onClick={() => setIsNewDialogOpen(true)}
-            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-10 px-6 font-bold text-xs"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t('add_project')}
-          </Button>
+          {user?.role === 'admin' && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={seedData}
+                disabled={loading}
+                className="rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-widest h-10 px-4 hover:bg-slate-50 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 mr-2" />
+                Seed Data
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={() => setIsNewDialogOpen(true)}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-10 px-6 font-bold text-xs"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('add_project')}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -293,7 +391,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
         {stats.map((stat, i) => (
           <Card 
             key={i} 
@@ -318,142 +416,86 @@ export const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Stage Distribution */}
-        <Card className="lg:col-span-2 border-none shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
-              {t('project_status')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px] sm:h-[400px] p-2 sm:p-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stageData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  interval={0} 
-                  height={100} 
-                  stroke="#94a3b8"
-                  fontSize={10}
-                  fontWeight={600}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis stroke="#94a3b8" fontSize={10} fontWeight={600} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ 
-                    borderRadius: '16px', 
-                    border: 'none', 
-                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
+      {/* Highlighted Projects Grid */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Briefcase className="w-5 h-5 text-indigo-600" />
+            {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
+          </h2>
+          {filterStatus && (
+            <Button variant="ghost" size="sm" onClick={() => setFilterStatus(null)} className="h-8 text-xs font-bold text-indigo-600">
+              View All
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProjects.length === 0 ? (
+            <div className="col-span-full text-center py-16 text-slate-400 text-sm font-medium bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+              No projects found.
+            </div>
+          ) : (
+            filteredProjects.map((project) => {
+              const projectPayments = paymentStages.filter(p => p.project_id === project.id);
+              const totalValue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+              const totalReceived = projectPayments.reduce((sum, p) => sum + (p.amount_received || 0), 0);
+              
+              const projectVendorOrders = vendorOrders.filter(v => v.project_id === project.id);
+              const totalVendorCost = projectVendorOrders.reduce((sum, v) => sum + (v.total_amount || 0), 0);
+              const totalVendorPaid = projectVendorOrders.reduce((sum, v) => sum + (v.amount_paid || 0), 0);
+
+              return (
+                <div 
+                  key={project.id} 
+                  onClick={() => {
+                    setSelectedProject(project);
+                    setIsDetailsOpen(true);
                   }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  radius={[8, 8, 0, 0]}
-                  onClick={(data) => setFilterStatus(data.name)}
-                  className="cursor-pointer"
-                  barSize={window.innerWidth < 640 ? 20 : 40}
+                  className="bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border border-slate-100 hover:border-indigo-100 gap-4"
                 >
-                  {stageData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]} 
-                      className={cn(
-                        "transition-all duration-300 hover:opacity-80",
-                        filterStatus && filterStatus !== entry.name ? "opacity-20" : "opacity-100"
-                      )}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Recent Projects */}
-        <div className="space-y-8">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-indigo-600" />
-                {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
-              </CardTitle>
-              {filterStatus && (
-                <Button variant="ghost" size="sm" onClick={() => setFilterStatus(null)} className="h-8 text-xs font-bold text-indigo-600">
-                  View All
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <div className="space-y-2">
-                {filteredProjects.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 text-sm font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    No projects found.
-                  </div>
-                ) : (
-                  filteredProjects.slice(0, 6).map((project) => (
-                    <div 
-                      key={project.id} 
-                      onClick={() => {
-                        setSelectedProject(project);
-                        setIsDetailsOpen(true);
-                      }}
-                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-indigo-50/50 cursor-pointer transition-all group border border-transparent hover:border-indigo-100"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                          {project.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{translateData(project.name)}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
-                        </div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-lg shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        {project.name.charAt(0)}
                       </div>
-                      <div className="text-right shrink-0 ml-4">
-                        <p className="text-xs font-black text-slate-900 tracking-tighter">{project.progress}%</p>
-                        <div className="w-12 sm:w-16 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                          <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
-                        </div>
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{translateData(project.name)}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-indigo-600" />
-                {t('recent_activity')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <div className="space-y-6 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
-                {[1, 2, 3].map((_, i) => (
-                  <div key={i} className="flex gap-4 relative">
-                    <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-50 flex items-center justify-center shadow-sm shrink-0 z-10 group-hover:border-indigo-100 transition-colors">
-                      <UsersIcon className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-end mb-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</span>
+                      <span className="text-sm font-black text-slate-900">{project.progress}%</span>
                     </div>
-                    <div className="pt-1">
-                      <p className="text-xs sm:text-sm font-medium text-slate-900 leading-relaxed">
-                        <span className="font-bold text-slate-900">{translateData('Mr. Maturi Ravi Teja')}</span> moved <span className="text-indigo-600 font-bold">{translateData('Mahadev Temple Complex')}</span> to <span className="text-slate-500 font-bold">{t('in_progress')}</span>
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">2 hours ago</p>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  
+                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
+                    <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
+                      <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Client Payments</p>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-emerald-700">₹{totalReceived.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-emerald-600/50">of ₹{totalValue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="bg-amber-50/50 p-3 rounded-2xl border border-amber-100/50">
+                      <p className="text-[9px] font-bold text-amber-600/70 uppercase tracking-widest mb-1">Vendor Costs</p>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-amber-700">₹{totalVendorPaid.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-amber-600/50">of ₹{totalVendorCost.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

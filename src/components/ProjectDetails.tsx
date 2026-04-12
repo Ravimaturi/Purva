@@ -42,6 +42,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ProjectVendorOrders } from './ProjectVendorOrders';
 import { toast } from 'sonner';
 import { format, parseISO, isValid } from 'date-fns';
 import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
@@ -66,12 +67,15 @@ const formatDate = (dateStr: string | null) => {
   }
 };
 
+import { TransactionComments } from './TransactionComments';
+
 interface ProjectDetailsProps {
   project: Project;
   onClose: () => void;
   onUpdate: () => void;
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
+  initialTab?: string;
 }
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ 
@@ -79,9 +83,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   onClose, 
   onUpdate,
   isMaximized = false,
-  onToggleMaximize
+  onToggleMaximize,
+  initialTab = 'activity'
 }) => {
-  const { user } = useUser();
+  const { user, allUsers } = useUser();
   const { addNotification } = useNotifications();
   const { t, translateData: rawTranslateData } = useLanguage();
   
@@ -153,6 +158,24 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }
   };
 
+  const notifyAssignee = async (action: string) => {
+    if (!user) return;
+    
+    const assigneeNameOrId = project.assigned_to;
+    if (!assigneeNameOrId) return;
+
+    const assignee = allUsers.find(u => u.full_name === assigneeNameOrId || u.id === assigneeNameOrId);
+    
+    // Don't notify if the person making the change is the assignee
+    if (assignee && assignee.id !== user.id) {
+      await addNotification(
+        'Project Update',
+        `${user.full_name} ${action} on project "${project.name}"`,
+        assignee.id
+      );
+    }
+  };
+
   useEffect(() => {
     fetchDetails();
     setEditData({
@@ -179,6 +202,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       if (error) throw error;
       
       await addNotification('Project Updated', `Project "${editData.name}" has been updated by ${user?.full_name}.`);
+      await notifyAssignee('updated project details');
       
       toast.success('Project updated');
       
@@ -242,6 +266,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       setNewTaskAssignee('');
       setNewTaskDeadline('');
       fetchDetails();
+      await notifyAssignee('added a new task');
       toast.success('Task added');
     } catch (err: any) {
       console.error('Failed to add task:', err);
@@ -268,6 +293,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       if (error) throw error;
       fetchDetails();
+      await notifyAssignee('updated a task status');
     } catch (err) {
       toast.error('Failed to update task');
     }
@@ -279,6 +305,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       const { error } = await supabase.from('tasks').delete().eq('id', taskIdToDelete);
       if (error) throw error;
       fetchDetails();
+      await notifyAssignee('deleted a task');
       toast.success('Task deleted');
     } catch (err) {
       toast.error('Failed to delete task');
@@ -324,21 +351,41 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       if (error) throw error;
 
       // Handle mentions
-      const mentions = newComment.match(/@\[([^\]]+)\]/g) || [];
-      for (const mention of mentions) {
-        const name = mention.slice(2, -1);
-        const mentionedUser = USERS.find(u => u.full_name === name);
+      const mentionedUserIds = new Set<string>();
+      
+      // 1. Explicit mentions using @[Name]
+      const explicitMentions = newComment.match(/@\[([^\]]+)\]/g) || [];
+      for (const mention of explicitMentions) {
+        const name = mention.slice(2, -1).trim().toLowerCase();
+        const mentionedUser = allUsers.find(u => u.full_name.trim().toLowerCase() === name);
         if (mentionedUser) {
-          await addNotification(
-            'You were tagged',
-            `${user.full_name} tagged you in a comment on project "${project.name}"`
-          );
+          mentionedUserIds.add(mentionedUser.id);
         }
+      }
+
+      // 2. Implicit mentions using @Name
+      for (const u of allUsers) {
+        const name = u.full_name.trim();
+        // Escape special characters in name
+        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`@${escapedName}(?:\\b|\\s|$)`, 'i');
+        if (regex.test(newComment)) {
+          mentionedUserIds.add(u.id);
+        }
+      }
+
+      for (const userId of mentionedUserIds) {
+        await addNotification(
+          'You were tagged',
+          `${user.full_name} tagged you in a comment on project "${project.name}"`,
+          userId
+        );
       }
 
       setNewComment('');
       setCommentType('internal');
       fetchDetails();
+      await notifyAssignee('added a comment');
       toast.success('Comment added');
     } catch (err) {
       console.error('Error adding comment:', err);
@@ -383,9 +430,21 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       }
       
       fetchDetails();
+      await notifyAssignee('updated payment details');
     } catch (err) {
       console.error('Error updating payment:', err);
       toast.error('Failed to update payment');
+    }
+  };
+
+  const updatePaymentComments = async (stageId: string, newComments: string) => {
+    try {
+      const { error } = await supabase.from('payment_stages').update({ comments: newComments }).eq('id', stageId);
+      if (error) throw error;
+      fetchDetails();
+    } catch (err) {
+      console.error('Error updating comments:', err);
+      toast.error('Failed to update comments');
     }
   };
 
@@ -404,6 +463,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       if (error) throw error;
       fetchDetails();
+      await notifyAssignee('updated payment status');
       toast.success('Payment status updated');
     } catch (err) {
       console.error('Error updating payment:', err);
@@ -444,6 +504,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       setNewStageAmount('');
       setNewStageDueDate('');
       fetchDetails();
+      await notifyAssignee('added a payment stage');
       toast.success('Payment stage added');
     } catch (err: any) {
       console.error('Failed to add payment stage:', err);
@@ -456,6 +517,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       const { error } = await supabase.from('payment_stages').delete().eq('id', id);
       if (error) throw error;
       fetchDetails();
+      await notifyAssignee('deleted a payment stage');
       toast.success('Payment stage deleted');
     } catch (err) {
       toast.error('Failed to delete payment stage');
@@ -552,15 +614,17 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   <Button size="sm" className="h-7 bg-indigo-600 rounded-lg text-[9px] font-bold px-2 sm:px-3" onClick={handleUpdateProject}>{t('save')}</Button>
                 </div>
               ) : (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsEditing(true)} 
-                  className="h-7 w-7 sm:w-auto sm:h-9 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2 p-0 sm:px-3"
-                >
-                  <Edit className="w-3.5 h-3.5 sm:w-4 h-4" />
-                  <span className="hidden lg:inline text-xs font-bold">{t('edit')}</span>
-                </Button>
+                user?.role === 'admin' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setIsEditing(true)} 
+                    className="h-7 w-7 sm:w-auto sm:h-9 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2 p-0 sm:px-3"
+                  >
+                    <Edit className="w-3.5 h-3.5 sm:w-4 h-4" />
+                    <span className="hidden lg:inline text-xs font-bold">{t('edit')}</span>
+                  </Button>
+                )
               )}
             </div>
           <Separator orientation="vertical" className="h-5 sm:h-6 hidden md:block" />
@@ -573,7 +637,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
         {/* Main Content Area (Left) */}
         <div className="flex-1 min-w-0 flex flex-col border-r border-slate-100 bg-white lg:overflow-hidden shrink-0 lg:shrink">
-          <Tabs defaultValue="activity" className="flex-1 flex flex-col lg:overflow-hidden">
+          <Tabs defaultValue={initialTab} className="flex-1 flex flex-col lg:overflow-hidden">
             <div className="px-4 sm:px-8 border-b border-slate-100 bg-slate-50/30 shrink-0">
               <TabsList className="bg-transparent h-12 sm:h-14 p-0 gap-4 sm:gap-8 overflow-x-auto no-scrollbar flex-nowrap justify-start">
                 <TabsTrigger value="activity" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
@@ -585,6 +649,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 {user?.role === 'admin' && (
                   <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                     {t('payments')}
+                  </TabsTrigger>
+                )}
+                {user?.role === 'admin' && (
+                  <TabsTrigger value="vendors" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
+                    Vendor Orders
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="audit" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
@@ -616,7 +685,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 Tag Team Member
                               </div>
                               <ScrollArea className="max-h-48">
-                                {USERS.filter(u => u.full_name.toLowerCase().includes(mentionSearch)).map(u => (
+                                {allUsers.filter(u => u.full_name.toLowerCase().includes(mentionSearch)).map(u => (
                                   <div 
                                     key={u.id}
                                     onClick={() => insertMention(u.full_name)}
@@ -664,7 +733,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
                     <div className="space-y-6">
                       {activityItems.map((item: any) => (
-                        <div key={item.id} className="relative pl-10">
+                        <div key={`${item.activityType}-${item.id}`} className="relative pl-10">
                           <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-white border border-slate-100 flex items-center justify-center shadow-sm z-10">
                             {item.activityType === 'task' ? (
                               <ListTodo className="w-4 h-4 text-indigo-600" />
@@ -741,9 +810,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             <SelectItem value="Unassigned">Unassigned</SelectItem>
-                            {USERS.map(u => (
-                              <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
-                            ))}
+                            {user?.role === 'admin' || project.assigned_to === user?.full_name ? (
+                              USERS.map(u => (
+                                <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
+                              ))
+                            ) : (
+                              project.assigned_to ? (
+                                <SelectItem value={project.assigned_to}>{project.assigned_to}</SelectItem>
+                              ) : null
+                            )}
                           </SelectContent>
                         </Select>
                         <Input 
@@ -763,7 +838,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-amber-600">
                           <Lightbulb className="w-4 h-4" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest">Suggested for {STAGE_LABELS[project.status]}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest">{t('suggestions')} for {translateData(STAGE_LABELS[project.status])}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {TASK_TEMPLATES[project.status]
@@ -775,7 +850,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 className="text-[10px] font-bold px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-full hover:bg-amber-100 transition-all"
                                 title="Click to fill the task name above"
                               >
-                                + {title}
+                                + {translateData(title)}
                               </button>
                             ))
                           }
@@ -855,17 +930,19 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 )}
                               </div>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => {
-                                setTaskIdToDelete(task.id);
-                                setIsTaskDeleteDialogOpen(true);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 h-8 w-8 text-slate-300 hover:text-red-500 transition-all"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </Button>
+                            {user?.role === 'admin' && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setTaskIdToDelete(task.id);
+                                  setIsTaskDeleteDialogOpen(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 h-8 w-8 text-slate-300 hover:text-red-500 transition-all"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         ))
                       )}
@@ -1023,79 +1100,94 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
                     <div className="space-y-4">
                       {paymentStages.map((stage) => (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group gap-4">
-                            <div className="flex items-center gap-3 sm:gap-5">
-                              <div className={cn(
-                                "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-sm shrink-0",
-                                stage.status === 'Paid' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                              )}>
-                                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />
+                          <div key={stage.id} className="flex flex-col p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 sm:gap-5">
+                                <div className={cn(
+                                  "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-sm shrink-0",
+                                  stage.status === 'Paid' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                )}>
+                                  <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-sm font-bold text-slate-900 truncate">{translateData(stage.stage_name)}</h4>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{t('due_date')} {formatDate(stage.due_date)}</p>
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <h4 className="text-sm font-bold text-slate-900 truncate">{translateData(stage.stage_name)}</h4>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{t('due_date')} {formatDate(stage.due_date)}</p>
+                              
+                              <div className="flex flex-wrap items-center gap-4 sm:justify-end">
+                                <div className="flex flex-col items-start sm:items-end gap-1">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount')}</p>
+                                  <p className="text-sm font-black text-slate-900">₹ {stage.amount.toLocaleString()}</p>
+                                </div>
+                                
+                                <div className="flex flex-col items-start sm:items-end gap-1 min-w-[100px]">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount_received')}</p>
+                                  <div className="flex items-center gap-2">
+                                    <Input 
+                                      type="number"
+                                      value={localPaymentAmounts[stage.id] || ''}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setLocalPaymentAmounts(prev => ({ ...prev, [stage.id]: val }));
+                                      }}
+                                      onBlur={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        updatePaymentReceived(stage.id, val);
+                                      }}
+                                      className="h-8 w-24 text-xs font-bold rounded-lg border-slate-200"
+                                    />
+                                    {stage.amount_received >= stage.amount ? (
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    ) : (
+                                      <Clock className="w-4 h-4 text-amber-500" />
+                                    )}
+                                  </div>
+                                </div>
+    
+                                <div className="flex flex-col items-start sm:items-end gap-1 min-w-[120px]">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('received_date')}</p>
+                                  <Input 
+                                    type="date"
+                                    value={localPaymentDates[stage.id] || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setLocalPaymentDates(prev => ({ ...prev, [stage.id]: val }));
+                                      updatePaymentReceived(stage.id, parseFloat(localPaymentAmounts[stage.id]) || 0, val);
+                                    }}
+                                    className="h-8 w-32 text-xs font-bold rounded-lg border-slate-200"
+                                  />
+                                </div>
+    
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => deletePaymentStage(stage.id)}
+                                  className="h-9 w-9 text-slate-300 hover:text-red-500 transition-all sm:opacity-0 sm:group-hover:opacity-100"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </Button>
                               </div>
                             </div>
                             
-                            <div className="flex flex-wrap items-center gap-4 sm:justify-end">
-                              <div className="flex flex-col items-start sm:items-end gap-1">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount')}</p>
-                                <p className="text-sm font-black text-slate-900">₹ {stage.amount.toLocaleString()}</p>
-                              </div>
-                              
-                              <div className="flex flex-col items-start sm:items-end gap-1 min-w-[100px]">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount_received')}</p>
-                                <div className="flex items-center gap-2">
-                                  <Input 
-                                    type="number"
-                                    value={localPaymentAmounts[stage.id] || ''}
-                                    placeholder="0"
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setLocalPaymentAmounts(prev => ({ ...prev, [stage.id]: val }));
-                                    }}
-                                    onBlur={(e) => {
-                                      const val = parseFloat(e.target.value) || 0;
-                                      updatePaymentReceived(stage.id, val);
-                                    }}
-                                    className="h-8 w-20 sm:w-24 text-xs font-bold rounded-lg border-slate-200"
-                                  />
-                                  {stage.amount_received >= stage.amount ? (
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                  ) : (
-                                    <Clock className="w-4 h-4 text-amber-500" />
-                                  )}
-                                </div>
-                              </div>
-  
-                              <div className="flex flex-col items-start sm:items-end gap-1 min-w-[120px]">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('received_date')}</p>
-                                <Input 
-                                  type="date"
-                                  value={localPaymentDates[stage.id] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setLocalPaymentDates(prev => ({ ...prev, [stage.id]: val }));
-                                    updatePaymentReceived(stage.id, parseFloat(localPaymentAmounts[stage.id]) || 0, val);
-                                  }}
-                                  className="h-8 w-28 sm:w-32 text-xs font-bold rounded-lg border-slate-200"
-                                />
-                              </div>
-  
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => deletePaymentStage(stage.id)}
-                                className="h-9 w-9 text-slate-300 hover:text-red-500 transition-all sm:opacity-0 sm:group-hover:opacity-100"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </Button>
+                            <div className="w-full pt-4 mt-2 border-t border-slate-50">
+                              <TransactionComments 
+                                commentsJson={stage.comments} 
+                                onUpdate={(newCommentsJson) => updatePaymentComments(stage.id, newCommentsJson)} 
+                              />
                             </div>
                           </div>
                       ))}
                     </div>
                   </TabsContent>
                 )}
+
+                  {user?.role === 'admin' && (
+                    <TabsContent value="vendors" className="mt-0 p-4 sm:p-8 flex-1">
+                      <ProjectVendorOrders project={project} />
+                    </TabsContent>
+                  )}
 
                   <TabsContent value="audit" className="mt-0">
                     <div className="space-y-8 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
@@ -1229,12 +1321,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             {PROJECT_STAGES.map(stage => (
-                              <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                              <SelectItem key={stage} value={stage}>{translateData(STAGE_LABELS[stage])}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="text-sm font-bold text-slate-900">{STAGE_LABELS[project.status]}</p>
+                        <p className="text-sm font-bold text-slate-900">{translateData(STAGE_LABELS[project.status])}</p>
                       )}
                     </div>
                   </div>

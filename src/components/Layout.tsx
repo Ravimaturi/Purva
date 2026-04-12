@@ -11,7 +11,8 @@ import {
   Users as UsersIcon,
   Menu,
   X as CloseIcon,
-  MoreVertical
+  MoreVertical,
+  Building2
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -31,6 +32,14 @@ import { Button } from './ui/button';
 import { cn, getInitials } from '../lib/utils';
 import { toast } from 'sonner';
 
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle 
+} from './ui/dialog';
+import { format } from 'date-fns';
+
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
@@ -40,37 +49,49 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const { user, setUser, allUsers } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t, translateData } = useLanguage();
+  const [showHistory, setShowHistory] = React.useState(false);
 
-  const navItems = [
+  React.useEffect(() => {
+    if (user?.role === 'employee' && activeTab === 'dashboard') {
+      setActiveTab('my-projects');
+    }
+  }, [user?.role, activeTab, setActiveTab]);
+
+  const navItems = user?.role === 'admin' ? [
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
     { id: 'projects', label: t('projects'), icon: ListTodo },
     { id: 'project-kanban', label: t('project_status'), icon: Trello },
     { id: 'kanban', label: t('kanban'), icon: Trello },
     { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
+    { id: 'vendors', label: 'Vendors', icon: Building2 },
+    { id: 'team', label: t('team'), icon: UsersIcon }
+  ] : [
+    { id: 'my-projects', label: 'My Projects', icon: ListTodo },
+    { id: 'kanban', label: t('kanban'), icon: Trello },
+    { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
   ];
-
-  // Only show Team tab to admins
-  if (user?.role === 'admin') {
-    navItems.push({ id: 'team', label: t('team'), icon: UsersIcon });
-  }
 
   const UserMenuContent = () => (
     <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 p-2">
       <div className="px-2 py-2 mb-1">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Current User</p>
-        <p className="text-sm font-bold text-slate-900 mt-1">{user?.full_name}</p>
-        <p className="text-[10px] text-slate-500">{user?.email}</p>
+        <p className="text-sm font-bold text-slate-900">{user?.full_name}</p>
+        <div className="flex flex-col mt-1">
+          <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{translateData(user?.designation || 'N/A')}</p>
+          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{user?.role.toUpperCase()}</p>
+        </div>
       </div>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={() => setActiveTab('profile')}>
         <User className="mr-2 h-4 w-4" />
         <span>My Profile</span>
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => setActiveTab('team')}>
-        <UsersIcon className="mr-2 h-4 w-4" />
-        <span>Team Management</span>
-      </DropdownMenuItem>
+      {user?.role === 'admin' && (
+        <DropdownMenuItem onClick={() => setActiveTab('team')}>
+          <UsersIcon className="mr-2 h-4 w-4" />
+          <span>Team Management</span>
+        </DropdownMenuItem>
+      )}
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
@@ -88,7 +109,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               )}
             >
               <span className="font-bold text-xs">{u.full_name}</span>
-              <span className="text-[10px] opacity-70">{u.role}</span>
+              <span className="text-[10px] opacity-70 uppercase">{u.role.toUpperCase()}</span>
             </DropdownMenuItem>
           ))}
         </div>
@@ -201,14 +222,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               <DropdownMenuContent align="end" className="w-80 rounded-xl shadow-lg border-slate-200 p-0 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h3 className="font-bold text-sm text-slate-900">Notifications</h3>
-                  {unreadCount > 0 && (
+                  <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => markAllAsRead()}
-                      className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider hover:text-indigo-700"
+                      onClick={() => setShowHistory(true)}
+                      className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hover:text-slate-700"
                     >
-                      Mark all as read
+                      History
                     </button>
-                  )}
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={() => markAllAsRead()}
+                        className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider hover:text-indigo-700"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   {notifications.length > 0 ? (
@@ -246,54 +275,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger 
-                render={
-                  <Button variant="ghost" size="icon" className="rounded-full text-slate-500 hidden sm:flex">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 p-2">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Account Settings</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setActiveTab('profile')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>My Profile</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
-                  <div className="max-h-60 overflow-y-auto px-1">
-                    {allUsers.map((u) => (
-                      <DropdownMenuItem 
-                        key={u.id} 
-                        onClick={() => {
-                          setUser(u as any);
-                          toast.success(`Switched to ${u.full_name}`);
-                        }}
-                        className={cn(
-                          "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
-                          user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
-                        )}
-                      >
-                        <span className="font-bold text-xs">{u.full_name}</span>
-                        <span className="text-[10px] opacity-70">{u.role}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600" onClick={() => {
-                  setUser(null);
-                  window.location.reload();
-                }}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+
 
             {/* Profile Button in Header */}
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100">
@@ -332,6 +314,45 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             </div>
           </div>
         </header>
+
+        {/* Notification History Dialog */}
+        <Dialog open={showHistory} onOpenChange={setShowHistory}>
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col p-0 overflow-hidden rounded-3xl">
+            <DialogHeader className="p-6 border-b border-slate-100 bg-slate-50/50">
+              <DialogTitle className="text-xl font-bold text-slate-900">Notification History</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6">
+              {notifications.length > 0 ? (
+                <div className="space-y-4">
+                  {notifications.map((n) => (
+                    <div key={n.id} className="flex gap-4 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                        <Bell className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {format(new Date(n.created_at), 'MMM d, yyyy h:mm a')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 leading-relaxed">{n.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bell className="w-8 h-8 text-slate-300" />
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">No history</p>
+                  <p className="text-sm text-slate-500 mt-1">You don't have any notifications yet.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Content Area */}
         <div className="flex-1 p-4 lg:p-8 overflow-y-auto">

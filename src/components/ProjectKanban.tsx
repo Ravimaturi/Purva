@@ -17,6 +17,7 @@ import {
 import { format, parseISO, isValid } from 'date-fns';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Select, 
@@ -146,7 +147,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, projects, onProjectC
            STAGE_LABELS[stage] === 'In Progress' ? <Clock className="w-3.5 h-3.5" /> : 
            STAGE_LABELS[stage] === 'On Hold' ? <AlertCircle className="w-3.5 h-3.5" /> :
            <AlertCircle className="w-3.5 h-3.5" />}
-          {translateData(stage)}
+          {translateData(STAGE_LABELS[stage])}
         </div>
         <span className="bg-white/50 px-2 py-0.5 rounded-full">
           {stageProjects.length}
@@ -185,6 +186,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, projects, onProjectC
 
 export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> = ({ onProjectClick }) => {
   const { user } = useUser();
+  const { addNotification } = useNotifications();
   const { t, translateData } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -289,6 +291,22 @@ export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> =
           .eq('id', activeId);
 
         if (error) throw error;
+        
+        // Notify assignee
+        if (activeProject.assigned_to && user && activeProject.assigned_to !== user.full_name) {
+          const { data: profiles } = await supabase.from('profiles').select('*');
+          if (profiles) {
+            const assignee = profiles.find(u => u.full_name === activeProject.assigned_to || u.id === activeProject.assigned_to);
+            if (assignee && assignee.id !== user.id) {
+              await addNotification(
+                'Project Update',
+                `${user.full_name} moved project "${activeProject.name}" to ${STAGE_LABELS[newStatus]}`,
+                assignee.id
+              );
+            }
+          }
+        }
+        
         toast.success(`Project moved to ${STAGE_LABELS[newStatus]}`);
       } catch (err) {
         toast.error('Failed to update project status');
@@ -326,7 +344,7 @@ export const ProjectKanban: React.FC<{ onProjectClick: (p: Project) => void }> =
               <SelectContent className="rounded-xl">
                 <SelectItem value="all">All Stages</SelectItem>
                 {PROJECT_STAGES.map(stage => (
-                  <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                  <SelectItem key={stage} value={stage}>{translateData(STAGE_LABELS[stage])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -37,6 +37,7 @@ import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useUser } from '../contexts/UserContext';
 import { Sheet, SheetContent } from './ui/sheet';
 import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
@@ -53,7 +54,13 @@ const formatDate = (dateStr: string | null) => {
   }
 };
 
-export const ProjectList: React.FC = () => {
+interface ProjectListProps {
+  employeeView?: boolean;
+  onProjectClick?: (project: Project, tab?: string) => void;
+}
+
+export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjectClick }) => {
+  const { user } = useUser();
   const { addNotification } = useNotifications();
   const { t, translateData } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -83,17 +90,30 @@ export const ProjectList: React.FC = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      console.log('Fetching projects...');
       const { data, error } = await supabase
         .from('projects')
         .select('*');
       
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
-      console.log('Projects fetched:', data);
-      setProjects(data || []);
+      
+      let finalProjects = data || [];
+      
+      if (employeeView && user) {
+        const { data: userTasks } = await supabase
+          .from('tasks')
+          .select('project_id')
+          .eq('assigned_to', user.full_name);
+          
+        const projectIdsWithTasks = new Set(userTasks?.map(t => t.project_id) || []);
+        
+        finalProjects = finalProjects.filter(p => 
+          p.assigned_to === user.full_name || projectIdsWithTasks.has(p.id)
+        );
+      }
+      
+      setProjects(finalProjects);
     } catch (err: any) {
       console.error('Error fetching projects:', err);
       toast.error(`Failed to load projects: ${err.message}`);
@@ -187,13 +207,15 @@ export const ProjectList: React.FC = () => {
             />
           </div>
         </div>
-        <Button 
-          onClick={() => setIsNewDialogOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold text-sm transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {t('add_project')}
-        </Button>
+        {!employeeView && (
+          <Button 
+            onClick={() => setIsNewDialogOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold text-sm transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {t('add_project')}
+          </Button>
+        )}
       </div>
 
       {/* Mobile Card View */}
@@ -215,8 +237,12 @@ export const ProjectList: React.FC = () => {
             <Card 
               key={project.id} 
               onClick={() => {
-                setSelectedProject(project);
-                setIsDetailsOpen(true);
+                if (onProjectClick) {
+                  onProjectClick(project);
+                } else {
+                  setSelectedProject(project);
+                  setIsDetailsOpen(true);
+                }
               }}
               className="border-none shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer overflow-hidden rounded-3xl"
             >
@@ -227,7 +253,7 @@ export const ProjectList: React.FC = () => {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{translateData(project.client_name)}</p>
                   </div>
                   <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter shrink-0">
-                    {STAGE_LABELS[project.status]}
+                    {translateData(STAGE_LABELS[project.status])}
                   </Badge>
                 </div>
 
@@ -295,7 +321,7 @@ export const ProjectList: React.FC = () => {
                         {uniqueStatuses.map(status => (
                           <DropdownMenuItem key={status} onClick={() => setStatusFilter(status)}>
                             <span className={cn(statusFilter === status && "font-bold text-indigo-600")}>
-                              {status === 'All' ? 'All' : STAGE_LABELS[status as any] || status}
+                              {status === 'All' ? t('all_projects') : translateData(STAGE_LABELS[status as any] || status)}
                             </span>
                           </DropdownMenuItem>
                         ))}
@@ -368,8 +394,12 @@ export const ProjectList: React.FC = () => {
                     key={project.id} 
                     className="hover:bg-indigo-50/30 border-slate-50 group cursor-pointer transition-colors"
                     onClick={() => {
-                      setSelectedProject(project);
-                      setIsDetailsOpen(true);
+                      if (onProjectClick) {
+                        onProjectClick(project);
+                      } else {
+                        setSelectedProject(project);
+                        setIsDetailsOpen(true);
+                      }
                     }}
                   >
                     <TableCell className="py-5 px-6">
@@ -383,7 +413,7 @@ export const ProjectList: React.FC = () => {
                     <TableCell className="text-xs text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap hidden md:table-cell">{translateData(project.client_name)}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-tighter whitespace-nowrap">
-                        {STAGE_LABELS[project.status]}
+                        {translateData(STAGE_LABELS[project.status])}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
@@ -423,21 +453,27 @@ export const ProjectList: React.FC = () => {
                           <DropdownMenuItem 
                             className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest"
                             onClick={() => {
-                              setSelectedProject(project);
-                              setIsDetailsOpen(true);
+                              if (onProjectClick) {
+                                onProjectClick(project);
+                              } else {
+                                setSelectedProject(project);
+                                setIsDetailsOpen(true);
+                              }
                             }}
                           >
                             <Eye className="w-4 h-4 mr-2 text-indigo-600" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest text-red-600 focus:text-red-600 focus:bg-red-50"
-                            onClick={() => {
-                              setProjectIdToDelete(project.id);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" /> Delete Project
-                          </DropdownMenuItem>
+                          {!employeeView && (
+                            <DropdownMenuItem 
+                              className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest text-red-600 focus:text-red-600 focus:bg-red-50"
+                              onClick={() => {
+                                setProjectIdToDelete(project.id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete Project
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
