@@ -1,13 +1,65 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
-import { Mail, Shield, User as UserIcon, Calendar, LogOut } from 'lucide-react';
+import { Mail, Shield, User as UserIcon, Calendar, LogOut, Phone, Edit2, Save, X } from 'lucide-react';
 import { getInitials } from '../lib/utils';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
 
 export const Profile: React.FC = () => {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: user?.full_name || '',
+    phone_number: user?.phone_number || ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!user) return;
+    if (!editForm.full_name.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editForm.full_name,
+          phone_number: editForm.phone_number
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setUser({
+        ...user,
+        full_name: editForm.full_name,
+        phone_number: editForm.phone_number
+      });
+      setIsEditing(false);
+      toast.success('Profile updated successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
 
   if (!user) {
     return (
@@ -47,8 +99,22 @@ export const Profile: React.FC = () => {
         </Card>
 
         <Card className="md:col-span-2 border-none shadow-sm">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-semibold">Account Details</CardTitle>
+            {!isEditing ? (
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">
+                <Edit2 className="w-4 h-4 mr-2" /> Edit Profile
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-700">
+                  <X className="w-4 h-4 mr-2" /> Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700">
+                  <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -56,7 +122,30 @@ export const Profile: React.FC = () => {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <UserIcon className="w-3 h-3" /> Full Name
                 </p>
-                <p className="text-sm font-medium text-slate-900">{user.full_name}</p>
+                {isEditing ? (
+                  <Input 
+                    value={editForm.full_name} 
+                    onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
+                    className="h-9 mt-1"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-slate-900">{user.full_name}</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Phone className="w-3 h-3" /> Phone Number
+                </p>
+                {isEditing ? (
+                  <Input 
+                    value={editForm.phone_number} 
+                    onChange={(e) => setEditForm({...editForm, phone_number: e.target.value})}
+                    placeholder="+1 234 567 8900"
+                    className="h-9 mt-1"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-slate-900">{user.phone_number || 'Not provided'}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -95,7 +184,7 @@ export const Profile: React.FC = () => {
             <div className="pt-6 border-t border-slate-100">
               <button 
                 className="flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700 transition-colors"
-                onClick={() => window.location.reload()} // Demo logout
+                onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4" />
                 Log out of account

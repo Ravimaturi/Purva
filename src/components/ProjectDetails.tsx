@@ -45,7 +45,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { ProjectVendorOrders } from './ProjectVendorOrders';
 import { toast } from 'sonner';
 import { format, parseISO, isValid } from 'date-fns';
-import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
+import { PROJECT_STAGES, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
 import { 
   Select, 
   SelectContent, 
@@ -811,7 +811,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           <SelectContent className="rounded-xl">
                             <SelectItem value="Unassigned">Unassigned</SelectItem>
                             {user?.role === 'admin' || project.assigned_to === user?.full_name ? (
-                              USERS.map(u => (
+                              allUsers.map(u => (
                                 <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
                               ))
                             ) : (
@@ -1294,7 +1294,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             <SelectItem value="Unassigned">Unassigned</SelectItem>
-                            {USERS.map(u => (
+                            {allUsers.map(u => (
                               <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
                             ))}
                           </SelectContent>

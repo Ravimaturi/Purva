@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Profile } from '../types';
-import { USERS } from '../constants';
 import { supabase } from '../lib/supabase';
 
 interface UserContextType {
@@ -8,20 +7,96 @@ interface UserContextType {
   setUser: (user: Profile | null) => void;
   allUsers: Profile[];
   refreshUsers: () => Promise<void>;
+  loading: boolean;
+  recoveryMode: boolean;
+  setRecoveryMode: (mode: boolean) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Profile | null>(() => {
-    const saved = localStorage.getItem('purva_vedic_user');
-    return saved ? JSON.parse(saved) : USERS[0];
-  });
-  const [allUsers, setAllUsers] = useState<Profile[]>(USERS as any);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [allUsers, setAllUsers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchCurrentUserProfile(session.user);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+      }
+
+      if (session?.user) {
+        fetchCurrentUserProfile(session.user);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
     fetchProfiles();
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const fetchCurrentUserProfile = async (sessionUser: any) => {
+    try {
+      // Fetch by email (case-insensitive) instead of ID to prevent mismatch issues
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', sessionUser.email)
+        .maybeSingle();
+      
+      if (error) throw error;
+
+      if (data) {
+        // If the IDs don't match (e.g. user was recreated in auth), we should ideally use the session ID
+        // But to keep the UI working, we will load the profile we found.
+        setUser({ ...data, id: sessionUser.id } as Profile);
+      } else {
+        // Fallback if profile doesn't exist in the database yet
+        const isInitialAdmin = sessionUser.email?.toLowerCase() === 'ravi.maturi46@gmail.com' || 
+                               sessionUser.email?.toLowerCase() === 'raviteja.m@purvavedic.com';
+                               
+        const fallbackProfile: Profile = {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          full_name: sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'User',
+          role: isInitialAdmin ? 'admin' : 'employee'
+        };
+        setUser(fallbackProfile);
+        
+        // Attempt to auto-create the profile
+        supabase.from('profiles').insert([fallbackProfile]).then(({error: insertError}) => {
+          if (insertError) console.error('Failed to auto-create profile:', insertError);
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching current user profile:', err);
+      // Ensure user is set even if fetch fails so they aren't stuck on login screen
+      const isInitialAdmin = sessionUser.email?.toLowerCase() === 'ravi.maturi46@gmail.com' || 
+                             sessionUser.email?.toLowerCase() === 'raviteja.m@purvavedic.com';
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email,
+        full_name: sessionUser.email?.split('@')[0] || 'User',
+        role: isInitialAdmin ? 'admin' : 'employee'
+      } as Profile);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -33,33 +108,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       if (data && data.length > 0) {
         setAllUsers(data);
-        // Sync current user if they exist in the new data
-        if (user) {
-          const updatedUser = data.find(u => u.id === user.id);
-          if (updatedUser) {
-            // Check if any field has changed to avoid unnecessary re-renders
-            const hasChanged = JSON.stringify(updatedUser) !== JSON.stringify(user);
-            if (hasChanged) {
-              setUser(updatedUser);
-            }
-          }
-        }
       }
     } catch (err) {
       console.error('Error fetching profiles in context:', err);
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('purva_vedic_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('purva_vedic_user');
-    }
-  }, [user]);
-
   return (
-    <UserContext.Provider value={{ user, setUser, allUsers, refreshUsers: fetchProfiles }}>
+    <UserContext.Provider value={{ user, setUser, allUsers, refreshUsers: fetchProfiles, loading, recoveryMode, setRecoveryMode }}>
       {children}
     </UserContext.Provider>
   );

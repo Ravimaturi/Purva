@@ -17,7 +17,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from './ui/select';
-import { PROJECT_STAGES, USERS, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
+import { PROJECT_STAGES, TASK_TEMPLATES, STAGE_LABELS } from '../constants';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -41,7 +41,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
     client_name: '',
     description: '',
     status: PROJECT_STAGES[0],
-    assigned_to: USERS[0].full_name,
+    assigned_to: allUsers[0]?.full_name || '',
     deadline: '',
   });
 
@@ -103,7 +103,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
         client_name: '',
         description: '',
         status: PROJECT_STAGES[0],
-        assigned_to: USERS[0].full_name,
+        assigned_to: allUsers[0]?.full_name || '',
         deadline: '',
       });
     } catch (err: any) {
@@ -170,8 +170,8 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {USERS.map(user => (
-                    <SelectItem key={user.id} value={user.full_name}>{user.full_name}</SelectItem>
+                  {allUsers.map(u => (
+                    <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

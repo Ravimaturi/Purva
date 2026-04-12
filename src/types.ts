@@ -16,6 +16,7 @@ export interface Profile {
   emp_code?: string;
   designation?: string;
   DOJ?: string;
+  phone_number?: string;
 }
 
 export interface Project {

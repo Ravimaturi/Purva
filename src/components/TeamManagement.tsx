@@ -47,7 +47,6 @@ import { Profile, UserRole } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { USERS } from '../constants';
 import { cn, getInitials } from '../lib/utils';
 
 export const TeamManagement: React.FC = () => {
@@ -88,9 +87,9 @@ export const TeamManagement: React.FC = () => {
       
       if (error) throw error;
       setUsers(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching users:', err);
-      toast.error('Failed to load team members');
+      toast.error(`Failed to load team members: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

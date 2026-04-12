@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Project, PaymentStage, VendorOrder } from '../types';
-import { PROJECT_STAGES, USERS, STAGE_LABELS } from '../constants';
+import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
@@ -34,7 +34,7 @@ export const Dashboard: React.FC = () => {
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
-  const { user } = useUser();
+  const { user, allUsers } = useUser();
   const { t, translateData } = useLanguage();
 
   useEffect(() => {
@@ -73,9 +73,9 @@ export const Dashboard: React.FC = () => {
         supabase.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       ]);
 
-      // 1. Upsert profiles to ensure names are updated
-      const { error: uError } = await supabase.from('profiles').upsert(USERS, { onConflict: 'id' });
-      if (uError) console.error('Error seeding profiles:', uError);
+      // 1. We no longer upsert profiles here. We use the real profiles from the database.
+      const getUserId = (name: string) => allUsers.find(u => u.full_name === name)?.id || user?.id;
+      const getUserName = (name: string) => allUsers.find(u => u.full_name === name)?.full_name || user?.full_name || 'Unassigned';
 
       // 2. Sample Vendors
       const sampleVendors = [
@@ -121,7 +121,7 @@ export const Dashboard: React.FC = () => {
           status: 'Construction',
           progress: 45,
           deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'M Ravi Teja',
+          assigned_to: getUserName('M Ravi Teja'),
           last_updated: new Date().toISOString()
         },
         {
@@ -131,7 +131,7 @@ export const Dashboard: React.FC = () => {
           status: 'Advance Received',
           progress: 20,
           deadline: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'DNV Prasad Sthapathy',
+          assigned_to: getUserName('DNV Prasad Sthapathy'),
           last_updated: new Date().toISOString()
         },
         {
@@ -141,7 +141,7 @@ export const Dashboard: React.FC = () => {
           status: 'Discussion',
           progress: 10,
           deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
-          assigned_to: 'G Siva Krishna Sthapathy',
+          assigned_to: getUserName('G Siva Krishna Sthapathy'),
           last_updated: new Date().toISOString()
         },
         {
@@ -295,14 +295,14 @@ export const Dashboard: React.FC = () => {
         // 7. Sample Notifications for Mentions
         const sampleNotifications = [
           {
-            user_id: USERS.find(u => u.full_name === 'G Siva Krishna Sthapathy')?.id,
+            user_id: getUserId('G Siva Krishna Sthapathy'),
             title: 'You were tagged',
             message: `M Dyanesh Kumar tagged you in a comment on project "${project1.name}"`,
             read: false,
             created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
-            user_id: USERS.find(u => u.full_name === 'M Ravi Teja')?.id,
+            user_id: getUserId('M Ravi Teja'),
             title: 'You were tagged',
             message: `G Siva Krishna Sthapathy tagged you in a comment on project "${project1.name}"`,
             read: false,

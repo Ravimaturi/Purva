@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Vendor, VendorOrder, Project } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
+import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
+import { ConfirmDialog } from './ConfirmDialog';
+import { toast } from 'sonner';
 
 interface VendorManagementProps {
   onProjectClick?: (project: Project, tab?: string) => void;
@@ -16,6 +19,7 @@ interface VendorManagementProps {
 
 export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectClick }) => {
   const { t } = useLanguage();
+  const { user } = useUser();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [orders, setOrders] = useState<VendorOrder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -37,6 +41,9 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+  const [isEditVendorOpen, setIsEditVendorOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   
   const [newVendorName, setNewVendorName] = useState('');
   const [newContactPersonName, setNewContactPersonName] = useState('');
@@ -60,6 +67,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
     
     if (error) {
       console.error('Error adding vendor:', error);
+      toast.error('Failed to add vendor');
       return;
     }
 
@@ -72,7 +80,74 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
       setNewPanCardNo('');
       setNewGstNo('');
       setNewServicesList('');
+      toast.success('Vendor added successfully');
     }
+  };
+
+  const handleEditClick = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setNewVendorName(vendor.vendor_name);
+    setNewContactPersonName(vendor.contact_person_name || '');
+    setNewPhoneNo(vendor.phone_no || '');
+    setNewPanCardNo(vendor.pan_card_no || '');
+    setNewGstNo(vendor.gst_no || '');
+    setNewServicesList(vendor.services_list || '');
+    setIsEditVendorOpen(true);
+  };
+
+  const handleUpdateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVendor) return;
+
+    const updatedVendor = {
+      vendor_name: newVendorName,
+      contact_person_name: newContactPersonName,
+      phone_no: newPhoneNo,
+      pan_card_no: newPanCardNo,
+      gst_no: newGstNo,
+      services_list: newServicesList,
+    };
+    
+    const { error } = await supabase
+      .from('vendors')
+      .update(updatedVendor)
+      .eq('id', selectedVendor.id);
+    
+    if (error) {
+      console.error('Error updating vendor:', error);
+      toast.error('Failed to update vendor');
+      return;
+    }
+
+    setVendors(vendors.map(v => v.id === selectedVendor.id ? { ...v, ...updatedVendor } : v));
+    setIsEditVendorOpen(false);
+    setSelectedVendor(null);
+    toast.success('Vendor updated successfully');
+  };
+
+  const handleDeleteClick = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedVendor) return;
+
+    const { error } = await supabase
+      .from('vendors')
+      .delete()
+      .eq('id', selectedVendor.id);
+
+    if (error) {
+      console.error('Error deleting vendor:', error);
+      toast.error('Failed to delete vendor. Ensure there are no active orders for this vendor.');
+      return;
+    }
+
+    setVendors(vendors.filter(v => v.id !== selectedVendor.id));
+    setIsDeleteConfirmOpen(false);
+    setSelectedVendor(null);
+    toast.success('Vendor deleted successfully');
   };
 
   const filteredVendors = vendors.filter(v => 
@@ -122,6 +197,26 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{vendor.services_list}</p>
                   </div>
                 </div>
+                {user?.role === 'admin' && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditClick(vendor)}
+                      className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClick(vendor)}
+                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 mb-6">
@@ -263,6 +358,94 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isEditVendorOpen} onOpenChange={setIsEditVendorOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Vendor</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateVendor} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Vendor Name</label>
+              <Input 
+                required
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                className="rounded-xl"
+                placeholder="e.g. ABC Construction Supplies"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Contact Person</label>
+                <Input 
+                  value={newContactPersonName}
+                  onChange={(e) => setNewContactPersonName(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Phone No.</label>
+                <Input 
+                  required
+                  value={newPhoneNo}
+                  onChange={(e) => setNewPhoneNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Phone Number"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">PAN Card No.</label>
+                <Input 
+                  value={newPanCardNo}
+                  onChange={(e) => setNewPanCardNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="PAN"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">GST No.</label>
+                <Input 
+                  value={newGstNo}
+                  onChange={(e) => setNewGstNo(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="GSTIN"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Services / Goods Provided</label>
+              <Input 
+                required
+                value={newServicesList}
+                onChange={(e) => setNewServicesList(e.target.value)}
+                className="rounded-xl"
+                placeholder="e.g. Cement, Steel, Labor"
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setIsEditVendorOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button type="submit" className="bg-indigo-600 rounded-xl">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Vendor"
+        message={`Are you sure you want to delete ${selectedVendor?.vendor_name}? This action cannot be undone.`}
+        confirmText="Delete Vendor"
+        isDestructive={true}
+      />
     </div>
   );
 };
