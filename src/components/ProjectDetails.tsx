@@ -98,6 +98,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
@@ -113,6 +114,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [localPaymentAmounts, setLocalPaymentAmounts] = useState<Record<string, string>>({});
   const [localPaymentDates, setLocalPaymentDates] = useState<Record<string, string>>({});
   
+  // File upload state
+  const [newFileName, setNewFileName] = useState('');
+  const [newFileDescription, setNewFileDescription] = useState('');
+  const [newFileUrl, setNewFileUrl] = useState('');
+  const [isAddingFile, setIsAddingFile] = useState(false);
+
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   // Scroll to top when project changes
@@ -225,19 +232,62 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   const fetchDetails = async () => {
     try {
-      const [commentsRes, logsRes, paymentsRes, tasksRes] = await Promise.all([
+      const [commentsRes, logsRes, paymentsRes, tasksRes, filesRes] = await Promise.all([
         supabase.from('comments').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
         supabase.from('audit_logs').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
         supabase.from('payment_stages').select('*').eq('project_id', project.id).order('due_date', { ascending: true }),
-        supabase.from('tasks').select('*').eq('project_id', project.id).order('created_at', { ascending: true })
+        supabase.from('tasks').select('*').eq('project_id', project.id).order('created_at', { ascending: true }),
+        supabase.from('project_files').select('*').eq('project_id', project.id).order('created_at', { ascending: false })
       ]);
 
       setComments(commentsRes.data || []);
       setAuditLogs(logsRes.data || []);
       setPaymentStages(paymentsRes.data || []);
       setTasks(tasksRes.data || []);
+      setFiles(filesRes.data || []);
     } catch (err) {
       console.error('Error fetching details:', err);
+    }
+  };
+
+  const handleAddFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFileName.trim() || !newFileUrl.trim() || !user) return;
+
+    setIsAddingFile(true);
+    try {
+      const { error } = await supabase.from('project_files').insert({
+        project_id: project.id,
+        name: newFileName,
+        description: newFileDescription,
+        url: newFileUrl,
+        uploaded_by: user.id
+      });
+
+      if (error) throw error;
+
+      toast.success('File added successfully');
+      setNewFileName('');
+      setNewFileDescription('');
+      setNewFileUrl('');
+      fetchDetails();
+      
+      // Log change
+      await supabase.from('audit_logs').insert({
+        project_id: project.id,
+        user_id: user.id,
+        user_name: user.full_name,
+        action: 'File Added',
+        details: `Added file: ${newFileName}`,
+        created_at: new Date().toISOString()
+      });
+      
+      notifyAssignee('added a new file to');
+    } catch (err: any) {
+      console.error('Error adding file:', err);
+      toast.error(`Failed to add file: ${err.message}`);
+    } finally {
+      setIsAddingFile(false);
     }
   };
 
@@ -646,6 +696,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 <TabsTrigger value="tasks" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                   {t('tasks')}
                 </TabsTrigger>
+                <TabsTrigger value="files" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
+                  Files
+                </TabsTrigger>
                 {user?.role === 'admin' && (
                   <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                     {t('payments')}
@@ -945,6 +998,103 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             )}
                           </div>
                         ))
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="files" className="mt-0 space-y-8 outline-none p-4 sm:p-8 flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Project Files</h3>
+                    </div>
+
+                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4">Add New File Link</h4>
+                      <form onSubmit={handleAddFile} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input 
+                            placeholder="File Name (e.g., Site Plan)" 
+                            value={newFileName}
+                            onChange={(e) => setNewFileName(e.target.value)}
+                            className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                            required
+                          />
+                          <Input 
+                            placeholder="SharePoint URL" 
+                            value={newFileUrl}
+                            onChange={(e) => setNewFileUrl(e.target.value)}
+                            className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                            type="url"
+                            required
+                          />
+                        </div>
+                        <Textarea 
+                          placeholder="Description (optional)" 
+                          value={newFileDescription}
+                          onChange={(e) => setNewFileDescription(e.target.value)}
+                          className="min-h-[80px] rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                        />
+                        <Button 
+                          type="submit" 
+                          disabled={isAddingFile}
+                          className="bg-indigo-600 rounded-xl px-6 font-bold shadow-lg shadow-indigo-100"
+                        >
+                          {isAddingFile ? 'Adding...' : 'Add File Link'}
+                        </Button>
+                      </form>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      {files.length === 0 ? (
+                        <div className="text-center py-16 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+                          <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                          <p className="text-sm font-medium text-slate-400">No files added yet.</p>
+                        </div>
+                      ) : (
+                        files.map((file) => {
+                          const uploader = allUsers.find(u => u.id === file.uploaded_by);
+                          return (
+                            <div key={file.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                              <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                                  <FileText className="w-5 h-5 text-indigo-600" />
+                                </div>
+                                <div className="flex flex-col">
+                                  <a 
+                                    href={file.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-sm font-bold text-indigo-600 hover:underline transition-all break-words line-clamp-1"
+                                  >
+                                    {file.name}
+                                  </a>
+                                  {file.description && (
+                                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                                      {file.description}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-3 mt-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                      <UserIcon className="w-3 h-3" />
+                                      {uploader?.full_name || 'Unknown User'}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatDate(file.created_at)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => window.open(file.url, '_blank')}
+                                className="rounded-xl font-bold text-xs shrink-0"
+                              >
+                                Open Link
+                              </Button>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </TabsContent>

@@ -109,3 +109,13 @@ export interface VendorOrder {
   comments: string;
   created_at: string;
 }
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  url: string;
+  uploaded_by: string;
+  created_at: string;
+}

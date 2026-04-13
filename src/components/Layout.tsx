@@ -17,6 +17,7 @@ import {
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { supabase } from '../lib/supabase';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -93,29 +94,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Switch Account (Demo)</DropdownMenuLabel>
-        <div className="max-h-60 overflow-y-auto px-1">
-          {allUsers.map((u) => (
-            <DropdownMenuItem 
-              key={u.id} 
-              onClick={() => {
-                setUser(u as any);
-                toast.success(`Switched to ${u.full_name}`);
-              }}
-              className={cn(
-                "flex flex-col items-start gap-0.5 py-2 px-2 rounded-lg mb-1",
-                user?.id === u.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
-              )}
-            >
-              <span className="font-bold text-xs">{u.full_name}</span>
-              <span className="text-[10px] opacity-70 uppercase">{u.role.toUpperCase()}</span>
-            </DropdownMenuItem>
-          ))}
-        </div>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem className="text-red-600" onClick={() => {
+      <DropdownMenuItem className="text-red-600" onClick={async () => {
+        await supabase.auth.signOut();
         setUser(null);
         window.location.reload();
       }}>
