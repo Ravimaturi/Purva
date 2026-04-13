@@ -53,7 +53,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t, translateData } = useLanguage();
   const [showHistory, setShowHistory] = React.useState(false);
-  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (user?.role === 'employee' && activeTab === 'dashboard') {
@@ -67,10 +66,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     { id: 'project-kanban', label: t('project_status'), icon: Trello },
     { id: 'kanban', label: t('kanban'), icon: Trello },
     { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
-    { id: 'vendors', label: 'Vendors', icon: Building2 },
+    { id: 'vendors', label: t('vendors'), icon: Building2 },
     { id: 'team', label: t('team'), icon: UsersIcon }
   ] : [
-    { id: 'my-projects', label: 'My Projects', icon: ListTodo },
+    { id: 'my-projects', label: t('my_projects'), icon: ListTodo },
     { id: 'kanban', label: t('kanban'), icon: Trello },
     { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
   ];
@@ -81,29 +80,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <p className="text-sm font-bold text-slate-900">{user?.full_name}</p>
         <div className="flex flex-col mt-1">
           <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{translateData(user?.designation || 'N/A')}</p>
-          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{user?.role.toUpperCase()}</p>
+          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{t(user?.role || '')}</p>
         </div>
       </div>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={() => { setActiveTab('profile'); setIsProfileOpen(false); }}>
+      <DropdownMenuItem onClick={() => setActiveTab('profile')}>
         <User className="mr-2 h-4 w-4" />
         <span>My Profile</span>
       </DropdownMenuItem>
       {user?.role === 'admin' && (
-        <DropdownMenuItem onClick={() => { setActiveTab('team'); setIsProfileOpen(false); }}>
+        <DropdownMenuItem onClick={() => setActiveTab('team')}>
           <UsersIcon className="mr-2 h-4 w-4" />
-          <span>Team Management</span>
+          <span>{t('team')}</span>
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-red-600" onClick={async () => {
-        setIsProfileOpen(false);
         await supabase.auth.signOut();
         setUser(null);
         window.location.reload();
       }}>
         <LogOut className="mr-2 h-4 w-4" />
-        <span>Log out</span>
+        <span>{t('logout')}</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   );
@@ -117,7 +115,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
           Purva Vedic
         </h1>
-        <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">Project Management</p>
+        <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">{t('project_management')}</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -167,7 +165,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             </Sheet>
             
             <h2 className="text-lg font-semibold text-slate-800 capitalize">
-              {activeTab.replace('-', ' ')}
+              {t(activeTab.replace('-', '_'))}
             </h2>
           </div>
 
@@ -267,7 +265,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
             {/* Profile Button in Header */}
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100">
-              <DropdownMenu open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+              <DropdownMenu>
                 <DropdownMenuTrigger 
                   render={
                     <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-10 rounded-xl hover:bg-slate-50 transition-all">
@@ -287,7 +285,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             
             {/* Mobile User Avatar */}
             <div className="lg:hidden">
-              <DropdownMenu open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+              <DropdownMenu>
                 <DropdownMenuTrigger 
                   render={
                     <Button variant="ghost" size="icon" className="rounded-full">

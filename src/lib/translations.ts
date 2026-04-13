@@ -2,6 +2,14 @@ export type Language = 'en' | 'te';
 
 export const translations: Record<Language, Record<string, string>> = {
   en: {
+    // Common
+    my_projects: 'My Projects',
+    project_management: 'Project Management',
+    employee: 'Employee',
+    admin: 'Admin',
+    vendors: 'Vendors',
+    no_projects_found: 'No projects found',
+    unassigned: 'Unassigned',
     dashboard: 'Projects Overview',
     projects: 'Projects List',
     team: 'Team Management',
@@ -114,6 +122,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Client Names
     dharma_rakshana_samithi: 'Dharma Rakshana Samithi',
     archaeological_survey: 'Archaeological Survey',
+    ananda_yoga_foundation: 'Ananda Yoga Foundation',
     // Descriptions
     a_grand_temple_complex_featuring_a_main_sanctum_prayer_halls_and_traditional_stone_carvings_following_dravidian_architecture: 'A grand temple complex featuring a main sanctum, prayer halls, and traditional stone carvings following Dravidian architecture.',
     restoration_of_a_12th_century_temple_structure_including_structural_reinforcement_and_stone_cleaning: 'Restoration of a 12th-century temple structure including structural reinforcement and stone cleaning.',
@@ -125,6 +134,7 @@ export const translations: Record<Language, Record<string, string>> = {
     mr_modukuri_dyanesh_kumar: 'Mr. Modukuri Dyanesh Kumar',
     ms_sri_vishnu_deepthy: 'Ms. Sri Vishnu Deepthy',
     mr_gandeti_siva_krishna: 'Mr. Gandeti Siva Krishna',
+    g_siva_krishna: 'G Siva Krishna',
     mr_uriti_vishnu: 'Mr. Uriti Vishnu',
     mr_kotha_raghavendra_sagar: 'Mr. Kotha Raghavendra Sagar',
     ms_sri_krishna_keerthy: 'Ms. Sri Krishna Keerthy',
@@ -140,6 +150,14 @@ export const translations: Record<Language, Record<string, string>> = {
     asst_sthapathy: 'Asst Sthapathy'
   },
   te: {
+    // Common
+    my_projects: 'నా ప్రాజెక్ట్‌లు',
+    project_management: 'ప్రాజెక్ట్ మేనేజ్‌మెంట్',
+    employee: 'ఉద్యోగి',
+    admin: 'అడ్మిన్',
+    vendors: 'విక్రేతలు',
+    no_projects_found: 'ప్రాజెక్ట్‌లు కనుగొనబడలేదు',
+    unassigned: 'కేటాయించబడలేదు',
     dashboard: 'ప్రాజెక్ట్‌ల అవలోకనం',
     projects: 'ప్రాజెక్ట్‌ల జాబితా',
     team: 'టీమ్ మేనేజ్‌మెంట్',
@@ -252,6 +270,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Client Names
     dharma_rakshana_samithi: 'ధర్మ రక్షణ సమితి',
     archaeological_survey: 'ఆర్కియాలజికల్ సర్వే',
+    ananda_yoga_foundation: 'ఆనంద యోగ ఫౌండేషన్',
     // Descriptions
     a_grand_temple_complex_featuring_a_main_sanctum_prayer_halls_and_traditional_stone_carvings_following_dravidian_architecture: 'ద్రావిడ వాస్తుశిల్పాన్ని అనుసరించి ప్రధాన గర్భాలయం, ప్రార్థనా మందిరాలు మరియు సాంప్రదాయ రాతి శిల్పాలతో కూడిన ఒక గొప్ప ఆలయ సముదాయం.',
     restoration_of_a_12th_century_temple_structure_including_structural_reinforcement_and_stone_cleaning: 'నిర్మాణ పటిష్టత మరియు రాతి శుభ్రతతో సహా 12వ శతాబ్దపు ఆలయ నిర్మాణం యొక్క పునరుద్ధరణ.',
@@ -263,6 +282,7 @@ export const translations: Record<Language, Record<string, string>> = {
     mr_modukuri_dyanesh_kumar: 'మిస్టర్ మొదుకూరి ద్యానేష్ కుమార్',
     ms_sri_vishnu_deepthy: 'మిస్ శ్రీ విష్ణు దీప్తి',
     mr_gandeti_siva_krishna: 'మిస్టర్ గండేటి శివ కృష్ణ',
+    g_siva_krishna: 'జి శివ కృష్ణ',
     mr_uriti_vishnu: 'మిస్టర్ ఉరిటి విష్ణు',
     mr_kotha_raghavendra_sagar: 'మిస్టర్ కొత్త రాఘవేంద్ర సాగర్',
     ms_sri_krishna_keerthy: 'మిస్ శ్రీ కృష్ణ కీర్తి',

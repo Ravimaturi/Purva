@@ -230,7 +230,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
           ))
         ) : filteredAndSortedProjects.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No projects found</p>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t('no_projects_found')}</p>
           </div>
         ) : (
           filteredAndSortedProjects.map((project) => (
@@ -261,11 +261,11 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   <div className="flex items-center gap-2">
                     <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
                       <AvatarFallback className="bg-indigo-600 text-white font-bold text-[8px]">
-                        {getInitials(project.assigned_to || 'Unassigned')}
+                        {getInitials(project.assigned_to || t('unassigned'))}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider truncate max-w-[100px]">
-                      {project.assigned_to ? translateData(project.assigned_to) : 'Unassigned'}
+                      {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
                     </span>
                   </div>
                   <div className="text-right">
@@ -384,7 +384,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
                       <Search className="w-8 h-8 opacity-20" />
-                      <p className="text-xs font-bold uppercase tracking-widest">No projects found</p>
+                      <p className="text-xs font-bold uppercase tracking-widest">{t('no_projects_found')}</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -420,11 +420,11 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
                           <AvatarFallback className="bg-indigo-600 text-white font-bold text-[9px]">
-                            {getInitials(project.assigned_to || 'Unassigned')}
+                            {getInitials(project.assigned_to || t('unassigned'))}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                          {project.assigned_to ? translateData(project.assigned_to) : 'Unassigned'}
+                          {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
                         </span>
                       </div>
                     </TableCell>
