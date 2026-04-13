@@ -12,7 +12,8 @@ import {
   Menu,
   X as CloseIcon,
   MoreVertical,
-  Building2
+  Building2,
+  Languages
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -52,6 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t, translateData } = useLanguage();
   const [showHistory, setShowHistory] = React.useState(false);
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (user?.role === 'employee' && activeTab === 'dashboard') {
@@ -83,18 +85,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </div>
       </div>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={() => setActiveTab('profile')}>
+      <DropdownMenuItem onClick={() => { setActiveTab('profile'); setIsProfileOpen(false); }}>
         <User className="mr-2 h-4 w-4" />
         <span>My Profile</span>
       </DropdownMenuItem>
       {user?.role === 'admin' && (
-        <DropdownMenuItem onClick={() => setActiveTab('team')}>
+        <DropdownMenuItem onClick={() => { setActiveTab('team'); setIsProfileOpen(false); }}>
           <UsersIcon className="mr-2 h-4 w-4" />
           <span>Team Management</span>
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-red-600" onClick={async () => {
+        setIsProfileOpen(false);
         await supabase.auth.signOut();
         setUser(null);
         window.location.reload();
@@ -169,29 +172,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 mr-2">
-              <Button 
-                variant={language === 'en' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setLanguage('en')}
-                className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", language === 'en' && "bg-white shadow-sm")}
-              >
-                EN
-              </Button>
-              <Button 
-                variant={language === 'te' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setLanguage('te')}
-                className={cn("h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider", language === 'te' && "bg-white shadow-sm")}
-              >
-                తెలుగు
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger 
+                render={
+                  <Button variant="ghost" size="icon" className="rounded-full text-slate-500 relative mr-1">
+                    <Languages className="h-5 w-5" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-32 rounded-xl shadow-lg border-slate-200 p-1">
+                <DropdownMenuItem 
+                  onClick={() => setLanguage('en')}
+                  className={cn("rounded-lg text-xs font-bold", language === 'en' && "bg-indigo-50 text-indigo-700")}
+                >
+                  English
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setLanguage('te')}
+                  className={cn("rounded-lg text-xs font-bold", language === 'te' && "bg-indigo-50 text-indigo-700")}
+                >
+                  తెలుగు
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger 
                 render={
-                  <Button variant="ghost" size="icon" className="rounded-full text-slate-500 hidden sm:flex relative">
+                  <Button variant="ghost" size="icon" className="rounded-full text-slate-500 relative">
                     <Bell className="h-5 w-5" />
                     {unreadCount > 0 && (
                       <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
@@ -259,7 +267,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
             {/* Profile Button in Header */}
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100">
-              <DropdownMenu>
+              <DropdownMenu open={isProfileOpen} onOpenChange={setIsProfileOpen}>
                 <DropdownMenuTrigger 
                   render={
                     <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-10 rounded-xl hover:bg-slate-50 transition-all">
@@ -279,7 +287,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             
             {/* Mobile User Avatar */}
             <div className="lg:hidden">
-              <DropdownMenu>
+              <DropdownMenu open={isProfileOpen} onOpenChange={setIsProfileOpen}>
                 <DropdownMenuTrigger 
                   render={
                     <Button variant="ghost" size="icon" className="rounded-full">

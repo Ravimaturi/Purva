@@ -351,16 +351,6 @@ export const Dashboard: React.FC = () => {
           {user?.role === 'admin' && (
             <>
               <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={seedData}
-                disabled={loading}
-                className="rounded-xl border-slate-200 bg-white font-bold text-[10px] uppercase tracking-widest h-10 px-4 hover:bg-slate-50 transition-all"
-              >
-                <Plus className="w-3.5 h-3.5 mr-2" />
-                Seed Data
-              </Button>
-              <Button 
                 variant="default" 
                 size="sm"
                 onClick={() => setIsNewDialogOpen(true)}
