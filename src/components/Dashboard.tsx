@@ -6,7 +6,9 @@ import {
   AlertCircle,
   Plus,
   HardHat,
-  MessageSquare
+  MessageSquare,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -23,16 +25,29 @@ import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
 import { Sheet, SheetContent } from './ui/sheet';
 
+const PROJECT_COLORS = [
+  { bg: 'bg-rose-50', text: 'text-rose-600', hoverBg: 'group-hover:bg-rose-600', border: 'hover:border-rose-200', progress: 'bg-rose-500' },
+  { bg: 'bg-orange-50', text: 'text-orange-600', hoverBg: 'group-hover:bg-orange-500', border: 'hover:border-orange-200', progress: 'bg-orange-500' },
+  { bg: 'bg-amber-50', text: 'text-amber-600', hoverBg: 'group-hover:bg-amber-500', border: 'hover:border-amber-200', progress: 'bg-amber-500' },
+  { bg: 'bg-yellow-50', text: 'text-yellow-600', hoverBg: 'group-hover:bg-yellow-500', border: 'hover:border-yellow-200', progress: 'bg-yellow-500' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-600', hoverBg: 'group-hover:bg-emerald-500', border: 'hover:border-emerald-200', progress: 'bg-emerald-500' },
+  { bg: 'bg-cyan-50', text: 'text-cyan-600', hoverBg: 'group-hover:bg-cyan-500', border: 'hover:border-cyan-200', progress: 'bg-cyan-500' },
+  { bg: 'bg-indigo-50', text: 'text-indigo-600', hoverBg: 'group-hover:bg-indigo-500', border: 'hover:border-indigo-200', progress: 'bg-indigo-500' },
+  { bg: 'bg-purple-50', text: 'text-purple-600', hoverBg: 'group-hover:bg-purple-500', border: 'hover:border-purple-200', progress: 'bg-purple-500' },
+];
+
 export const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [vendorOrders, setVendorOrders] = useState<VendorOrder[]>([]);
+  const [projectChecklists, setProjectChecklists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [isPrivacyMode, setIsPrivacyMode] = useState(true);
 
   const { user, allUsers } = useUser();
   const { t, translateData } = useLanguage();
@@ -43,16 +58,18 @@ export const Dashboard: React.FC = () => {
 
   const fetchProjects = async () => {
     try {
-      const [projectsRes, paymentsRes, vendorsRes] = await Promise.all([
+      const [projectsRes, paymentsRes, vendorsRes, checklistsRes] = await Promise.all([
         supabase.from('projects').select('*'),
         supabase.from('payment_stages').select('*'),
-        supabase.from('vendor_orders').select('*')
+        supabase.from('vendor_orders').select('*'),
+        supabase.from('project_checklists').select('project_id, is_completed, stage, order_index')
       ]);
       
       if (projectsRes.error) throw projectsRes.error;
       setProjects(projectsRes.data || []);
       setPaymentStages(paymentsRes.data || []);
       setVendorOrders(vendorsRes.data || []);
+      setProjectChecklists(checklistsRes.data || []);
     } catch (err) {
       console.error('Error fetching projects:', err);
     } finally {
@@ -413,11 +430,25 @@ export const Dashboard: React.FC = () => {
             <Briefcase className="w-5 h-5 text-indigo-600" />
             {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
           </h2>
-          {filterStatus && (
-            <Button variant="ghost" size="sm" onClick={() => setFilterStatus(null)} className="h-8 text-xs font-bold text-indigo-600">
-              View All
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsPrivacyMode(!isPrivacyMode)} 
+              className={cn(
+                "h-8 text-xs font-bold rounded-xl border-slate-200 transition-colors",
+                isPrivacyMode ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white border-slate-800" : "bg-white text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              {isPrivacyMode ? <EyeOff className="w-3.5 h-3.5 mr-1.5" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
+              Privacy Mode
             </Button>
-          )}
+            {filterStatus && (
+              <Button variant="ghost" size="sm" onClick={() => setFilterStatus(null)} className="h-8 text-xs font-bold text-indigo-600">
+                View All
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -426,7 +457,7 @@ export const Dashboard: React.FC = () => {
               No projects found.
             </div>
           ) : (
-            filteredProjects.map((project) => {
+            filteredProjects.map((project, index) => {
               const projectPayments = paymentStages.filter(p => p.project_id === project.id);
               const totalValue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
               const totalReceived = projectPayments.reduce((sum, p) => sum + (p.amount_received || 0), 0);
@@ -435,6 +466,17 @@ export const Dashboard: React.FC = () => {
               const totalVendorCost = projectVendorOrders.reduce((sum, v) => sum + (v.total_amount || 0), 0);
               const totalVendorPaid = projectVendorOrders.reduce((sum, v) => sum + (v.amount_paid || 0), 0);
 
+              const projectItems = projectChecklists.filter(c => c.project_id === project.id).sort((a, b) => a.order_index - b.order_index);
+              const totalItems = projectItems.length;
+              const completedItems = projectItems.filter(c => c.is_completed).length;
+              const checklistProgress = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+              
+              const firstIncomplete = projectItems.find(c => !c.is_completed);
+              const currentStage = firstIncomplete ? firstIncomplete.stage : (projectItems.length > 0 ? projectItems[projectItems.length - 1].stage : 'Execution Plan');
+              const stageDisplay = currentStage !== 'Execution Plan' ? `Execution: ${currentStage}` : 'Execution Plan';
+
+              const colorTheme = PROJECT_COLORS[index % PROJECT_COLORS.length];
+
               return (
                 <div 
                   key={project.id} 
@@ -442,27 +484,47 @@ export const Dashboard: React.FC = () => {
                     setSelectedProject(project);
                     setIsDetailsOpen(true);
                   }}
-                  className="bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border border-slate-100 hover:border-indigo-100 gap-4"
+                  className={cn(
+                    "bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border",
+                    "border-slate-100", colorTheme.border,
+                    "gap-4"
+                  )}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-lg shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white")}>
                         {project.name.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{translateData(project.name)}</p>
+                        <p className={cn("text-base font-bold text-slate-900 transition-colors truncate", `group-hover:${colorTheme.text}`)}>{translateData(project.name)}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
                       </div>
                     </div>
                   </div>
                   
-                  <div>
-                    <div className="flex justify-between items-end mb-1.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</span>
-                      <span className="text-sm font-black text-slate-900">{project.progress}%</span>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between items-end mb-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {t(project.status.toLowerCase().replace(/ /g, '_'))}
+                        </span>
+                        <span className="text-sm font-black text-slate-900">{project.progress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
+                        <div className={cn("h-full transition-all duration-1000", colorTheme.progress)} style={{ width: `${project.progress}%` }} />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
+
+                    <div>
+                      <div className="flex justify-between items-end mb-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[70%]">
+                          {stageDisplay}
+                        </span>
+                        <span className="text-sm font-black text-slate-900">{checklistProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden relative">
+                        <div className={cn("h-full transition-all duration-1000", colorTheme.progress, "opacity-70")} style={{ width: `${checklistProgress}%` }} />
+                      </div>
                     </div>
                   </div>
                   
@@ -470,15 +532,23 @@ export const Dashboard: React.FC = () => {
                     <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
                       <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Client Payments</p>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-emerald-700">₹{totalReceived.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-emerald-600/50">of ₹{totalValue.toLocaleString()}</span>
+                        <span className="text-sm font-black text-emerald-700">
+                          {isPrivacyMode ? '••••••' : `₹${totalReceived.toLocaleString()}`}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-600/50">
+                          of {isPrivacyMode ? '••••••' : `₹${totalValue.toLocaleString()}`}
+                        </span>
                       </div>
                     </div>
                     <div className="bg-amber-50/50 p-3 rounded-2xl border border-amber-100/50">
                       <p className="text-[9px] font-bold text-amber-600/70 uppercase tracking-widest mb-1">Vendor Costs</p>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-amber-700">₹{totalVendorPaid.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-amber-600/50">of ₹{totalVendorCost.toLocaleString()}</span>
+                        <span className="text-sm font-black text-amber-700">
+                          {isPrivacyMode ? '••••••' : `₹${totalVendorPaid.toLocaleString()}`}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-600/50">
+                          of {isPrivacyMode ? '••••••' : `₹${totalVendorCost.toLocaleString()}`}
+                        </span>
                       </div>
                     </div>
                   </div>

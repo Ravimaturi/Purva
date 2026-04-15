@@ -13,7 +13,6 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
       manifest: {
         name: 'Purva Vedic Consultancy, Project Management application',
         short_name: 'Purva Vedic',

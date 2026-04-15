@@ -56,6 +56,8 @@ import {
 import { KanbanBoard } from './KanbanBoard';
 import { CalendarView } from './CalendarView';
 import { Lightbulb } from 'lucide-react';
+import { ProjectChecklist } from './ProjectChecklist';
+import { DrawingsTracker } from './DrawingsTracker';
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return 'N/A';
@@ -119,6 +121,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [newFileDescription, setNewFileDescription] = useState('');
   const [newFileUrl, setNewFileUrl] = useState('');
   const [isAddingFile, setIsAddingFile] = useState(false);
+  const [checklistProgress, setChecklistProgress] = useState(0);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -232,12 +235,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   const fetchDetails = async () => {
     try {
-      const [commentsRes, logsRes, paymentsRes, tasksRes, filesRes] = await Promise.all([
+      const [commentsRes, logsRes, paymentsRes, tasksRes, filesRes, checklistsRes] = await Promise.all([
         supabase.from('comments').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
         supabase.from('audit_logs').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
         supabase.from('payment_stages').select('*').eq('project_id', project.id).order('due_date', { ascending: true }),
         supabase.from('tasks').select('*').eq('project_id', project.id).order('created_at', { ascending: true }),
-        supabase.from('project_files').select('*').eq('project_id', project.id).order('created_at', { ascending: false })
+        supabase.from('project_files').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
+        supabase.from('project_checklists').select('is_completed').eq('project_id', project.id)
       ]);
 
       setComments(commentsRes.data || []);
@@ -245,6 +249,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       setPaymentStages(paymentsRes.data || []);
       setTasks(tasksRes.data || []);
       setFiles(filesRes.data || []);
+      
+      const checklists = checklistsRes.data || [];
+      if (checklists.length > 0) {
+        const completed = checklists.filter(c => c.is_completed).length;
+        setChecklistProgress(Math.round((completed / checklists.length) * 100));
+      } else {
+        setChecklistProgress(0);
+      }
     } catch (err) {
       console.error('Error fetching details:', err);
     }
@@ -699,6 +711,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 <TabsTrigger value="files" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                   Files
                 </TabsTrigger>
+                <TabsTrigger value="execution-plan" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
+                  Execution Plan
+                </TabsTrigger>
                 {user?.role === 'admin' && (
                   <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                     {t('payments')}
@@ -1003,100 +1018,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   </TabsContent>
 
                   <TabsContent value="files" className="mt-0 space-y-8 outline-none p-4 sm:p-8 flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Project Files</h3>
-                    </div>
-
-                    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4">Add New File Link</h4>
-                      <form onSubmit={handleAddFile} className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <Input 
-                            placeholder="File Name (e.g., Site Plan)" 
-                            value={newFileName}
-                            onChange={(e) => setNewFileName(e.target.value)}
-                            className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                            required
-                          />
-                          <Input 
-                            placeholder="SharePoint URL" 
-                            value={newFileUrl}
-                            onChange={(e) => setNewFileUrl(e.target.value)}
-                            className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                            type="url"
-                            required
-                          />
-                        </div>
-                        <Textarea 
-                          placeholder="Description (optional)" 
-                          value={newFileDescription}
-                          onChange={(e) => setNewFileDescription(e.target.value)}
-                          className="min-h-[80px] rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                        />
-                        <Button 
-                          type="submit" 
-                          disabled={isAddingFile}
-                          className="bg-indigo-600 rounded-xl px-6 font-bold shadow-lg shadow-indigo-100"
-                        >
-                          {isAddingFile ? 'Adding...' : 'Add File Link'}
-                        </Button>
-                      </form>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      {files.length === 0 ? (
-                        <div className="text-center py-16 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
-                          <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                          <p className="text-sm font-medium text-slate-400">No files added yet.</p>
-                        </div>
-                      ) : (
-                        files.map((file) => {
-                          const uploader = allUsers.find(u => u.id === file.uploaded_by);
-                          return (
-                            <div key={file.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group">
-                              <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-                                  <FileText className="w-5 h-5 text-indigo-600" />
-                                </div>
-                                <div className="flex flex-col">
-                                  <a 
-                                    href={file.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-sm font-bold text-indigo-600 hover:underline transition-all break-words line-clamp-1"
-                                  >
-                                    {file.name}
-                                  </a>
-                                  {file.description && (
-                                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                                      {file.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                      <UserIcon className="w-3 h-3" />
-                                      {uploader?.full_name || 'Unknown User'}
-                                    </span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                      <Clock className="w-3 h-3" />
-                                      {formatDate(file.created_at)}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => window.open(file.url, '_blank')}
-                                className="rounded-xl font-bold text-xs shrink-0"
-                              >
-                                Open Link
-                              </Button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                    <DrawingsTracker 
+                      projectId={project.id} 
+                      projectName={project.name} 
+                      projectFiles={files}
+                      onFileUploaded={fetchDetails}
+                    />
                   </TabsContent>
 
                   <TabsContent value="kanban" className="mt-0 p-4 sm:p-8 flex-1">
@@ -1339,6 +1266,19 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     </TabsContent>
                   )}
 
+                  <TabsContent value="execution-plan" className="mt-0">
+                    <ProjectChecklist projectId={project.id} />
+                  </TabsContent>
+
+                  <TabsContent value="drawings-tracker" className="mt-0">
+                    <DrawingsTracker 
+                      projectId={project.id} 
+                      projectName={project.name} 
+                      projectFiles={files}
+                      onFileUploaded={fetchDetails}
+                    />
+                  </TabsContent>
+
                   <TabsContent value="audit" className="mt-0">
                     <div className="space-y-8 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
                       {auditLogs.map((log) => (
@@ -1384,6 +1324,21 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     style={{ width: `${project.progress}%` }}
                   />
                 </div>
+
+                {/* Execution Plan Progress */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Execution Plan</h3>
+                    <span className="text-sm font-black text-amber-500">{checklistProgress}%</span>
+                  </div>
+                  <div className="relative h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                    <div 
+                      className="absolute inset-y-0 left-0 bg-amber-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+                      style={{ width: `${checklistProgress}%` }}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tasks Done</p>
