@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ProjectChecklistProps {
   projectId: string;
@@ -33,6 +35,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
   const { user } = useUser();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [itemAudits, setItemAudits] = useState<Record<string, ItemAudit>>({});
+  const [projectData, setProjectData] = useState<{name: string, client_name: string} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [materialType, setMaterialType] = useState<'stone' | 'cement' | 'both'>('stone');
@@ -47,7 +50,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
 
   const fetchChecklistAndAudits = async () => {
     try {
-      const [checklistResponse, auditResponse] = await Promise.all([
+      const [checklistResponse, auditResponse, projectResponse] = await Promise.all([
         supabase
           .from('project_checklists')
           .select('*')
@@ -58,12 +61,18 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
           .select('*')
           .eq('project_id', projectId)
           .eq('action', 'Checklist Item Completed')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('projects')
+          .select('name, client_name')
+          .eq('id', projectId)
+          .single()
       ]);
 
       if (checklistResponse.error) throw checklistResponse.error;
       
       setItems(checklistResponse.data || []);
+      if (projectResponse.data) setProjectData(projectResponse.data);
 
       // Map audits to items (latest completion per item)
       const audits: Record<string, ItemAudit> = {};
@@ -298,9 +307,19 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
   };
 
   const downloadReport = () => {
-    const headers = ['Stage', 'Category', 'Task Name', 'Status', 'Entry Date', 'Completed By', 'Completed At'];
+    const doc = new jsPDF();
     
-    // Sort items by category and order_index
+    // Add title and project info
+    doc.setFontSize(16);
+    doc.text('Execution Plan Report', 14, 15);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Project Name: ${projectData?.name || 'Unknown'}`, 14, 25);
+    doc.text(`Client Name: ${projectData?.client_name || 'Unknown'}`, 14, 31);
+    doc.text(`Date Generated: ${format(new Date(), 'MMM dd, yyyy')}`, 14, 37);
+
+    // Sort items by execution order
     const sortedItems = [...items].sort((a, b) => {
       if (a.category === b.category) {
         return a.order_index - b.order_index;
@@ -308,34 +327,44 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
       return a.category.localeCompare(b.category);
     });
 
-    const csvContent = [
-      headers.join(','),
-      ...sortedItems.map(item => {
-        const audit = itemAudits[item.id];
-        const completedBy = audit ? audit.user_name : '';
-        const completedAt = audit ? format(new Date(audit.created_at), 'yyyy-MM-dd HH:mm') : '';
-        
-        return [
-          `"${item.stage}"`,
-          `"${item.category}"`,
-          `"${item.task_name.replace(/"/g, '""')}"`,
-          item.is_completed ? 'Completed' : 'Pending',
-          item.entry_date || '',
-          `"${completedBy}"`,
-          `"${completedAt}"`
-        ].join(',');
-      })
-    ].join('\n');
+    const tableData = sortedItems.map(item => {
+      const audit = itemAudits[item.id];
+      // Determine date: use entry_date if available
+      // If empty AND task is completed, fallback to the created_at from audit log
+      let dateField = item.entry_date || '';
+      if (!dateField && audit) {
+        dateField = format(new Date(audit.created_at), 'yyyy-MM-dd');
+      }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `execution_plan_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const status = item.is_completed ? 'Completed' : 'Pending';
+
+      return [
+        item.stage,
+        item.category,
+        item.task_name,
+        status,
+        dateField || '-'
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 45,
+      head: [['Stage', 'Category', 'Task Name', 'Status', 'Date']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 70, 229] }, // Indigo 600
+      styles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 'auto' },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 25 },
+      },
+    });
+
+    const fileName = `execution_plan_report_${projectData?.name?.replace(/\s+/g, '_') || 'project'}.pdf`;
+    doc.save(fileName);
   };
 
   if (isLoading) {
@@ -454,23 +483,23 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
             
             <div className="divide-y divide-slate-100">
               {categoryItems.sort((a, b) => a.order_index - b.order_index).map(item => {
-                const isClientApproval = item.task_name.startsWith('Client Approval');
+                const isClientTask = item.task_name.startsWith('Client');
                 const audit = itemAudits[item.id];
 
                 return (
-                  <div key={item.id} className={`flex items-center justify-between p-3 transition-colors group ${isClientApproval ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <div key={item.id} className={`flex items-center justify-between p-3 transition-colors group ${isClientTask ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-slate-50'}`}>
                     <div 
                       className="flex items-center gap-3 flex-1 cursor-pointer"
                       onClick={() => toggleItem(item.id, item.is_completed, item.task_name)}
                     >
                       {item.is_completed ? (
-                        <CheckCircle2 className={`w-5 h-5 shrink-0 ${isClientApproval ? 'text-amber-500' : 'text-emerald-500'}`} />
+                        <CheckCircle2 className={`w-5 h-5 shrink-0 ${isClientTask ? 'text-amber-500' : 'text-emerald-500'}`} />
                       ) : (
-                        <Circle className={`w-5 h-5 shrink-0 transition-colors ${isClientApproval ? 'text-amber-200 group-hover:text-amber-400' : 'text-slate-300 group-hover:text-indigo-400'}`} />
+                        <Circle className={`w-5 h-5 shrink-0 transition-colors ${isClientTask ? 'text-amber-200 group-hover:text-amber-400' : 'text-slate-300 group-hover:text-indigo-400'}`} />
                       )}
                       
                       <div className="flex flex-col">
-                        <span className={`text-sm ${item.is_completed ? 'text-slate-400 line-through' : (isClientApproval ? 'text-amber-900 font-bold' : 'text-slate-700 font-medium')}`}>
+                        <span className={`text-sm ${item.is_completed ? 'text-slate-400 line-through' : (isClientTask ? 'text-amber-900 font-bold' : 'text-slate-700 font-medium')}`}>
                           {item.task_name}
                         </span>
                         

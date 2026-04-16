@@ -1314,24 +1314,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             <div className="p-4 sm:p-8 space-y-10">
               {/* Progress Section */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{t('progress')}</h3>
-                  <span className="text-sm font-black text-indigo-600">{project.progress}%</span>
-                </div>
-                <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                  <div 
-                    className="absolute inset-y-0 left-0 bg-indigo-600 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(79,70,229,0.4)]"
-                    style={{ width: `${project.progress}%` }}
-                  />
-                </div>
-
                 {/* Execution Plan Progress */}
-                <div className="pt-2">
+                <div className="pt-0">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Execution Plan</h3>
                     <span className="text-sm font-black text-amber-500">{checklistProgress}%</span>
                   </div>
-                  <div className="relative h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                  <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
                     <div 
                       className="absolute inset-y-0 left-0 bg-amber-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(245,158,11,0.4)]"
                       style={{ width: `${checklistProgress}%` }}
@@ -1435,35 +1424,6 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                       )}
                     </div>
                   </div>
-
-                  {isEditing && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Progress (%)</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <Input 
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={editData.progress}
-                            onChange={handleProgressChange}
-                            className="text-sm font-bold text-slate-900 h-8 rounded-lg border-slate-200 w-20"
-                          />
-                          <input 
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={editData.progress}
-                            onChange={(e) => setEditData({ ...editData, progress: parseInt(e.target.value) })}
-                            className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 

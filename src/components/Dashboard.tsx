@@ -475,6 +475,17 @@ export const Dashboard: React.FC = () => {
               const currentStage = firstIncomplete ? firstIncomplete.stage : (projectItems.length > 0 ? projectItems[projectItems.length - 1].stage : 'Execution Plan');
               const stageDisplay = currentStage !== 'Execution Plan' ? `Execution: ${currentStage}` : 'Execution Plan';
 
+              // Get completed stages (categories)
+              const categories = [...new Set(projectItems.map(item => item.category))];
+              const completedCategories = categories.filter(cat => {
+                const catItems = projectItems.filter(i => i.category === cat);
+                return catItems.length > 0 && catItems.every(i => i.is_completed);
+              });
+              
+              const completedStagesText = completedCategories.length > 0 
+                ? completedCategories.join(', ') 
+                : 'No stages completed entirely';
+
               const colorTheme = PROJECT_COLORS[index % PROJECT_COLORS.length];
 
               return (
@@ -485,12 +496,12 @@ export const Dashboard: React.FC = () => {
                     setIsDetailsOpen(true);
                   }}
                   className={cn(
-                    "bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border",
+                    "bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border relative overflow-hidden",
                     "border-slate-100", colorTheme.border,
                     "gap-4"
                   )}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between relative z-10 bg-white group-hover:bg-transparent transition-colors">
                     <div className="flex items-center gap-4 min-w-0">
                       <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white")}>
                         {project.name.charAt(0)}
@@ -502,19 +513,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between items-end mb-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          {t(project.status.toLowerCase().replace(/ /g, '_'))}
-                        </span>
-                        <span className="text-sm font-black text-slate-900">{project.progress}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                        <div className={cn("h-full transition-all duration-1000", colorTheme.progress)} style={{ width: `${project.progress}%` }} />
-                      </div>
-                    </div>
-
+                  <div className="space-y-3 relative z-10 transition-all duration-300">
                     <div>
                       <div className="flex justify-between items-end mb-1.5">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[70%]">
@@ -522,13 +521,21 @@ export const Dashboard: React.FC = () => {
                         </span>
                         <span className="text-sm font-black text-slate-900">{checklistProgress}%</span>
                       </div>
-                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden relative">
-                        <div className={cn("h-full transition-all duration-1000", colorTheme.progress, "opacity-70")} style={{ width: `${checklistProgress}%` }} />
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
+                        <div className={cn("h-full transition-all duration-1000", colorTheme.progress)} style={{ width: `${checklistProgress}%` }} />
                       </div>
                     </div>
                   </div>
+
+                  {/* Hover Overlay showing completed stages */}
+                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-5 flex flex-col justify-center">
+                    <h4 className={cn("text-xs font-bold uppercase tracking-widest mb-2", colorTheme.text)}>Completed Stages</h4>
+                    <p className="text-sm text-slate-600 line-clamp-4 leading-relaxed font-medium">
+                      {completedStagesText}
+                    </p>
+                  </div>
                   
-                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
+                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50 relative z-10 bg-white group-hover:bg-transparent transition-colors duration-300">
                     <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
                       <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Client Payments</p>
                       <div className="flex flex-col">
