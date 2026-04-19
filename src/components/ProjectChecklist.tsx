@@ -9,9 +9,12 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { cn } from '../lib/utils';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ProjectChecklistProps {
   projectId: string;
+  onUpdate?: () => void;
 }
 
 interface ChecklistItem {
@@ -31,11 +34,11 @@ interface ItemAudit {
   created_at: string;
 }
 
-export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId }) => {
+export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, onUpdate }) => {
   const { user } = useUser();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [itemAudits, setItemAudits] = useState<Record<string, ItemAudit>>({});
-  const [projectData, setProjectData] = useState<{name: string, client_name: string} | null>(null);
+  const [projectData, setProjectData] = useState<{name: string, client_name: string, status: string} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [materialType, setMaterialType] = useState<'stone' | 'cement' | 'both'>('stone');
@@ -64,7 +67,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
           .order('created_at', { ascending: false }),
         supabase
           .from('projects')
-          .select('name, client_name')
+          .select('name, client_name, status')
           .eq('id', projectId)
           .single()
       ]);
@@ -114,18 +117,6 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
         });
       });
 
-      // Add Observation Items
-      OBSERVATION_ITEMS.forEach(item => {
-        newItems.push({
-          project_id: projectId,
-          stage: 'Design & Prep',
-          category: 'Observations',
-          task_name: item,
-          is_completed: false,
-          order_index: order++
-        });
-      });
-
       // Add Construction Items based on material
       let constructionItems = STONE_CONSTRUCTION_ITEMS;
       let categoryName = 'Construction (Stone)';
@@ -151,6 +142,18 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
         });
       });
 
+      // Add Observation Items
+      OBSERVATION_ITEMS.forEach(item => {
+        newItems.push({
+          project_id: projectId,
+          stage: 'Observations',
+          category: 'Observations',
+          task_name: item,
+          is_completed: false,
+          order_index: order++
+        });
+      });
+
       const { error } = await supabase.from('project_checklists').insert(newItems);
       if (error) throw error;
 
@@ -167,7 +170,8 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
   const toggleItem = async (id: string, currentStatus: boolean, taskName: string) => {
     try {
       // Optimistic update
-      setItems(items.map(item => item.id === id ? { ...item, is_completed: !currentStatus } : item));
+      const updatedItems = items.map(item => item.id === id ? { ...item, is_completed: !currentStatus } : item);
+      setItems(updatedItems);
       
       const { error } = await supabase
         .from('project_checklists')
@@ -175,6 +179,37 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Handle Automatic Project Status transition
+      // We only want to progress the status forward or backward based on the checklist
+      const designApprovalCompleted = updatedItems.some(i => i.task_name === 'Client: Approval of Design and Material to be used' && i.is_completed);
+      
+      const constructionItems = updatedItems.filter(i => i.category.startsWith('Construction'));
+      const constructionStarted = constructionItems.length > 0 && constructionItems.some(i => i.is_completed);
+      const allConstructionCompleted = constructionItems.length > 0 && constructionItems.every(i => i.is_completed);
+
+      const observationItems = updatedItems.filter(i => i.category === 'Observations');
+      const allObservationsCompleted = observationItems.length > 0 && observationItems.every(i => i.is_completed);
+
+      let newStatus = 'Discussion';
+      if (allConstructionCompleted && allObservationsCompleted) {
+        newStatus = 'Handover'; 
+      } else if (allConstructionCompleted) {
+        newStatus = 'Observations'; 
+      } else if (constructionStarted) {
+        newStatus = 'In Progress';
+      } else if (designApprovalCompleted) {
+        newStatus = 'Design & Prep';
+      }
+
+      // We only update if the status should change, but let's just always sync it unless the project is On Hold
+      // To do this properly, we need the current project status. We can get it from projectData if it's available.
+      // Easiest is to just fire the update to projects. We'll add project status to projectData.
+      if (projectData && projectData.status !== 'Work is on hold' && projectData.status !== newStatus) {
+        await supabase.from('projects').update({ status: newStatus }).eq('id', projectId);
+        setProjectData({ ...projectData, status: newStatus });
+        if (onUpdate) onUpdate();
+      }
 
       // Log to AuditLog if completed
       if (!currentStatus && user) {
@@ -185,10 +220,9 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
           action: 'Checklist Item Completed',
           details: id // Store item ID to map it back
         }]);
-        
-        // Refresh to get the new audit log
-        fetchChecklistAndAudits();
       }
+      
+      fetchChecklistAndAudits();
     } catch (error) {
       console.error('Error toggling item:', error);
       toast.error('Failed to update task');
@@ -320,11 +354,18 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
     doc.text(`Date Generated: ${format(new Date(), 'MMM dd, yyyy')}`, 14, 37);
 
     // Sort items by execution order
+    const categoryOrder = (cat: string) => {
+      if (cat === 'Design') return 1;
+      if (cat.startsWith('Construction')) return 2;
+      if (cat === 'Observations') return 3;
+      return 4;
+    };
+
     const sortedItems = [...items].sort((a, b) => {
       if (a.category === b.category) {
         return a.order_index - b.order_index;
       }
-      return a.category.localeCompare(b.category);
+      return categoryOrder(a.category) - categoryOrder(b.category);
     });
 
     const tableData = sortedItems.map(item => {
@@ -434,6 +475,9 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
   const completedItems = items.filter(i => i.is_completed).length;
   const progressPercentage = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
 
+  const { getDashboardColors } = useTheme();
+  const themeColors = getDashboardColors();
+
   return (
     <div className="space-y-8">
       {/* Overall Progress */}
@@ -444,7 +488,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
             <p className="text-xs text-slate-500">{completedItems} of {totalItems} tasks completed</p>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={downloadReport} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200">
+            <Button variant="outline" size="sm" onClick={downloadReport} className={cn("hover:bg-slate-50", themeColors.text, themeColors.border)}>
               <Download className="w-4 h-4 mr-2" />
               Report
             </Button>
@@ -452,22 +496,32 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId })
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset Plan
             </Button>
-            <span className="text-2xl font-black text-indigo-600">{progressPercentage}%</span>
+            <span className={cn("text-2xl font-black", themeColors.text)}>{progressPercentage}%</span>
           </div>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
           <div 
-            className="bg-indigo-600 h-3 rounded-full transition-all duration-500 ease-out" 
+            className={cn("h-3 rounded-full transition-all duration-500 ease-out", themeColors.solid)} 
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
       </div>
 
       {/* Categories */}
-      {Object.entries(groupedItems).map(([category, categoryItems]) => {
+      {Object.keys(groupedItems).sort((a, b) => {
+        const order = (cat: string) => {
+          if (cat === 'Design') return 1;
+          if (cat.startsWith('Construction')) return 2;
+          if (cat === 'Observations') return 3;
+          return 4;
+        };
+        return order(a) - order(b);
+      }).map((category) => {
+        const categoryItems = groupedItems[category];
         const catCompleted = categoryItems.filter(i => i.is_completed).length;
         const catTotal = categoryItems.length;
-        const stage = categoryItems[0]?.stage || 'Design & Prep';
+        let stage = categoryItems[0]?.stage || 'Design & Prep';
+        if (category === 'Observations') stage = 'Observations';
 
         return (
           <div key={category} className="bg-white border border-slate-200 rounded-xl overflow-hidden">

@@ -2,17 +2,23 @@ import { ProjectStatus } from './types';
 
 export const PROJECT_STAGES: ProjectStatus[] = [
   'Discussion',
-  'Advance Received',
-  'Construction',
+  'Design & Prep',
+  'In Progress',
+  'Observations',
   'Work is on hold',
-  'Completed'
+  'Handover'
 ];
 
 export const STAGE_LABELS: Record<ProjectStatus, string> = {
   'Discussion': 'Discussion',
+  'Design & Prep': 'Design & Prep',
+  'In Progress': 'In Progress',
+  'Observations': 'Observations',
+  'Work is on hold': 'On Hold',
+  'Handover': 'Handover',
+  // Legacy mappings
   'Advance Received': 'Design & Prep',
   'Construction': 'In Progress',
-  'Work is on hold': 'On Hold',
   'Completed': 'Handover'
 };
 
@@ -27,7 +33,7 @@ export const TASK_TEMPLATES: Record<ProjectStatus, string[]> = {
     'Request Technical Site Survey',
     'Finalize Resource Budget'
   ],
-  'Advance Received': [
+  'Design & Prep': [
     'Develop Detailed Section Drawings',
     'Issue Stone/Idol Purchase Order',
     'Issue Brass Idol Fabrication Order',
@@ -36,7 +42,7 @@ export const TASK_TEMPLATES: Record<ProjectStatus, string[]> = {
     'Initiate 3D Model Production',
     'Civil Work Update: Week 1'
   ],
-  'Construction': [
+  'In Progress': [
     'Review/Approve Revised Drawings',
     'Map Section & Layer Planes',
     'Detail Elevation Ornaments',
@@ -44,16 +50,26 @@ export const TASK_TEMPLATES: Record<ProjectStatus, string[]> = {
     'Sign Ancillary Vendor Contracts',
     'Weekly Structural Site Inspection'
   ],
+  'Observations': [
+    'Electrical wiring verification',
+    'Plumbing verification',
+    'HVAC / AC point verification',
+    'Final aesthetic review'
+  ],
   'Work is on hold': [
     'Document Site Halt Reason',
     'Contractual Terms Re-validation',
     'Quarterly Status Site Visit',
     'Resource Demobilization Log'
   ],
-  'Completed': [
+  'Handover': [
     'Verify Final Payment Status',
     'Audit Labor & Skill Expenses',
     'Schedule Consecration Ceremony',
     'Archive Project Documentation'
-  ]
+  ],
+  // Fallbacks
+  'Advance Received': [],
+  'Construction': [],
+  'Completed': []
 };

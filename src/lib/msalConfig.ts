@@ -8,7 +8,6 @@ export const msalConfig: Configuration = {
   },
   cache: {
     cacheLocation: "localStorage", // Changed to localStorage to share auth state across popup and main window
-    storeAuthStateInCookie: true, // Set to true to help with iframe/redirect issues
   },
 };
 

@@ -30,12 +30,20 @@ interface NewProjectDialogProps {
 
 import { useNotifications } from '../contexts/NotificationContext';
 import { useUser } from '../contexts/UserContext';
+import { fileToBase64 } from '../lib/utils';
+import { Image as ImageIcon, Upload } from 'lucide-react';
+
+import { ImageCropperDialog } from './ImageCropperDialog';
 
 export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpenChange, onSuccess }) => {
   const { addNotification } = useNotifications();
   const { user, allUsers } = useUser();
   const { translateData } = useLanguage();
   const [loading, setLoading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isCropOpen, setIsCropOpen] = React.useState(false);
+  const [cropImageSrc, setCropImageSrc] = React.useState('');
+  
   const [formData, setFormData] = useState({
     name: '',
     client_name: '',
@@ -43,7 +51,31 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
     status: PROJECT_STAGES[0],
     assigned_to: allUsers[0]?.full_name || '',
     deadline: '',
+    logo_url: '',
   });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo file size must be less than 2MB');
+      return;
+    }
+
+    try {
+      const base64 = await fileToBase64(file);
+      setCropImageSrc(base64);
+      setIsCropOpen(true);
+    } catch (err) {
+      toast.error('Failed to process image');
+    }
+  };
+
+  const handleCropComplete = (croppedBase64: string) => {
+    setFormData(prev => ({ ...prev, logo_url: croppedBase64 }));
+    setCropImageSrc('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,12 +147,44 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] rounded-3xl border-none shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold tracking-tight">Create New Project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="flex items-center gap-4">
+            {formData.logo_url ? (
+              <img src={formData.logo_url} alt="Logo" className="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100" />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                <ImageIcon className="w-6 h-6 text-slate-400" />
+              </div>
+            )}
+            <div className="flex-1">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Project Logo (Optional)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload
+                </Button>
+                {formData.logo_url && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, logo_url: '' })} className="text-red-500 hover:text-red-600">
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/png, image/jpeg, image/svg+xml"
+                onChange={handleLogoUpload}
+              />
+            </div>
+          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-slate-400">Project Name</Label>
             <Input 
@@ -143,23 +207,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
               onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Status</Label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(v) => setFormData({ ...formData, status: v as any })}
-              >
-                <SelectTrigger className="rounded-xl border-slate-200">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {PROJECT_STAGES.map(stage => (
-                    <SelectItem key={stage} value={stage}>{translateData(STAGE_LABELS[stage])}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Assigned To</Label>
               <Select 
@@ -217,5 +265,14 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
         </form>
       </DialogContent>
     </Dialog>
+    {isCropOpen && (
+      <ImageCropperDialog
+        open={isCropOpen}
+        onOpenChange={setIsCropOpen}
+        imageSrc={cropImageSrc}
+        onCropComplete={handleCropComplete}
+      />
+    )}
+    </>
   );
 };

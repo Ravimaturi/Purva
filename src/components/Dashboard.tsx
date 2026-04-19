@@ -8,7 +8,8 @@ import {
   HardHat,
   MessageSquare,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -16,6 +17,7 @@ import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Project, PaymentStage, VendorOrder } from '../types';
 import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
@@ -25,18 +27,8 @@ import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
 import { Sheet, SheetContent } from './ui/sheet';
 
-const PROJECT_COLORS = [
-  { bg: 'bg-rose-50', text: 'text-rose-600', hoverBg: 'group-hover:bg-rose-600', border: 'hover:border-rose-200', progress: 'bg-rose-500' },
-  { bg: 'bg-orange-50', text: 'text-orange-600', hoverBg: 'group-hover:bg-orange-500', border: 'hover:border-orange-200', progress: 'bg-orange-500' },
-  { bg: 'bg-amber-50', text: 'text-amber-600', hoverBg: 'group-hover:bg-amber-500', border: 'hover:border-amber-200', progress: 'bg-amber-500' },
-  { bg: 'bg-yellow-50', text: 'text-yellow-600', hoverBg: 'group-hover:bg-yellow-500', border: 'hover:border-yellow-200', progress: 'bg-yellow-500' },
-  { bg: 'bg-emerald-50', text: 'text-emerald-600', hoverBg: 'group-hover:bg-emerald-500', border: 'hover:border-emerald-200', progress: 'bg-emerald-500' },
-  { bg: 'bg-cyan-50', text: 'text-cyan-600', hoverBg: 'group-hover:bg-cyan-500', border: 'hover:border-cyan-200', progress: 'bg-cyan-500' },
-  { bg: 'bg-indigo-50', text: 'text-indigo-600', hoverBg: 'group-hover:bg-indigo-500', border: 'hover:border-indigo-200', progress: 'bg-indigo-500' },
-  { bg: 'bg-purple-50', text: 'text-purple-600', hoverBg: 'group-hover:bg-purple-500', border: 'hover:border-purple-200', progress: 'bg-purple-500' },
-];
-
 export const Dashboard: React.FC = () => {
+  const { dashboardStyle, getProjectColors, getDashboardColors } = useTheme();
   const [projects, setProjects] = useState<Project[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [vendorOrders, setVendorOrders] = useState<VendorOrder[]>([]);
@@ -62,7 +54,7 @@ export const Dashboard: React.FC = () => {
         supabase.from('projects').select('*'),
         supabase.from('payment_stages').select('*'),
         supabase.from('vendor_orders').select('*'),
-        supabase.from('project_checklists').select('project_id, is_completed, stage, order_index')
+        supabase.from('project_checklists').select('project_id, is_completed, stage, category, task_name, order_index')
       ]);
       
       if (projectsRes.error) throw projectsRes.error;
@@ -368,6 +360,15 @@ export const Dashboard: React.FC = () => {
           {user?.role === 'admin' && (
             <>
               <Button 
+                variant="outline" 
+                size="sm"
+                onClick={seedData}
+                disabled={loading}
+                className="rounded-xl border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 h-10 px-4 font-bold text-xs"
+              >
+                Seed Dummy Data
+              </Button>
+              <Button 
                 variant="default" 
                 size="sm"
                 onClick={() => setIsNewDialogOpen(true)}
@@ -475,18 +476,62 @@ export const Dashboard: React.FC = () => {
               const currentStage = firstIncomplete ? firstIncomplete.stage : (projectItems.length > 0 ? projectItems[projectItems.length - 1].stage : 'Execution Plan');
               const stageDisplay = currentStage !== 'Execution Plan' ? `Execution: ${currentStage}` : 'Execution Plan';
 
-              // Get completed stages (categories)
-              const categories = [...new Set(projectItems.map(item => item.category))];
-              const completedCategories = categories.filter(cat => {
-                const catItems = projectItems.filter(i => i.category === cat);
-                return catItems.length > 0 && catItems.every(i => i.is_completed);
-              });
-              
-              const completedStagesText = completedCategories.length > 0 
-                ? completedCategories.join(', ') 
-                : 'No stages completed entirely';
+              // Get Construction Category Name
+              const categoriesList = [...new Set(projectItems.map(item => item.category))].filter(Boolean) as string[];
+              const constructionCategory = categoriesList.find(cat => cat && cat.startsWith('Construction'));
+              const typeOfConstruction = constructionCategory || 'Construction';
 
-              const colorTheme = PROJECT_COLORS[index % PROJECT_COLORS.length];
+              // Generate latest completed tasks
+              const fullyCompletedCats = new Set<string>();
+              const categoriesCount: Record<string, {total: number, completed: number}> = {};
+              projectItems.forEach(i => {
+                if (!i.category) return;
+                if (!categoriesCount[i.category]) categoriesCount[i.category] = {total: 0, completed: 0};
+                categoriesCount[i.category].total++;
+                if (i.is_completed) categoriesCount[i.category].completed++;
+              });
+              Object.keys(categoriesCount).forEach(cat => {
+                if (categoriesCount[cat].total > 0 && categoriesCount[cat].completed === categoriesCount[cat].total) {
+                  fullyCompletedCats.add(cat);
+                }
+              });
+
+              const recentCompleted: string[] = [];
+              const reversedItems = [...projectItems].reverse();
+              const seenCats = new Set<string>();
+
+              for (const item of reversedItems) {
+                if (!item.is_completed) continue;
+                
+                if (fullyCompletedCats.has(item.category)) {
+                  if (!seenCats.has(item.category)) {
+                    recentCompleted.push(`${item.category} - Completed`);
+                    seenCats.add(item.category);
+                  }
+                } else {
+                  recentCompleted.push(`[${item.stage}] ${item.task_name}`);
+                }
+                
+                if (recentCompleted.length >= 3) break;
+              }
+
+              if (recentCompleted.length === 0) {
+                recentCompleted.push("No tasks completed yet");
+              }
+
+              // Let's display them sequentially logically (oldest to newest among the recent)
+              recentCompleted.reverse();
+
+              const colorTheme = getProjectColors(index);
+
+              let cardStyleClass = "bg-white border-slate-100 shadow-xl border";
+              if (dashboardStyle === 'flat') {
+                cardStyleClass = `${colorTheme.bg} border-none shadow-sm hover:shadow-md`;
+              } else if (dashboardStyle === 'border') {
+                cardStyleClass = `bg-white border-2 hover:border-[3px] shadow-none ${colorTheme.border}`;
+              } else if (dashboardStyle === 'glass') {
+                cardStyleClass = `bg-gradient-to-br from-white/60 to-white/30 backdrop-blur-md border border-white/40 shadow-xl`;
+              }
 
               return (
                 <div 
@@ -496,16 +541,19 @@ export const Dashboard: React.FC = () => {
                     setIsDetailsOpen(true);
                   }}
                   className={cn(
-                    "bg-white flex flex-col p-5 rounded-3xl hover:shadow-xl cursor-pointer transition-all group border relative overflow-hidden",
-                    "border-slate-100", colorTheme.border,
-                    "gap-4"
+                    "flex flex-col p-5 rounded-3xl cursor-pointer transition-all group relative overflow-hidden gap-4 hover:scale-[1.01] active:scale-[0.99]",
+                    cardStyleClass
                   )}
                 >
-                  <div className="flex items-start justify-between relative z-10 bg-white group-hover:bg-transparent transition-colors">
+                  <div className={cn("flex items-start justify-between relative z-10 transition-colors rounded-xl", dashboardStyle === 'flat' ? "" : "bg-transparent group-hover:bg-transparent")}>
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white")}>
-                        {project.name.charAt(0)}
-                      </div>
+                      {project.logo_url ? (
+                        <img src={project.logo_url} alt="Logo" className={cn("w-12 h-12 rounded-2xl object-contain shadow-sm shrink-0 transition-transform group-hover:scale-105 bg-white border border-slate-100", dashboardStyle === 'flat' ? "" : `ring-1 ring-slate-100`)} />
+                      ) : (
+                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white")}>
+                          {project.name.charAt(0)}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className={cn("text-base font-bold text-slate-900 transition-colors truncate", `group-hover:${colorTheme.text}`)}>{translateData(project.name)}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
@@ -528,14 +576,21 @@ export const Dashboard: React.FC = () => {
                   </div>
 
                   {/* Hover Overlay showing completed stages */}
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-5 flex flex-col justify-center">
-                    <h4 className={cn("text-xs font-bold uppercase tracking-widest mb-2", colorTheme.text)}>Completed Stages</h4>
-                    <p className="text-sm text-slate-600 line-clamp-4 leading-relaxed font-medium">
-                      {completedStagesText}
-                    </p>
+                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-5 flex flex-col justify-center items-start">
+                    <h4 className={cn("text-[10px] font-black uppercase tracking-widest mb-1", colorTheme.text)}>{typeOfConstruction}</h4>
+                    <p className="text-xs font-bold text-slate-800 mb-3 px-2 py-0.5 bg-slate-100 rounded-md">Status: {translateData(STAGE_LABELS[project.status])}</p>
+                    
+                    <div className="space-y-2 w-full mt-2">
+                      {recentCompleted.map((line, i) => (
+                        <div key={i} className="text-xs text-slate-600 font-medium flex items-start gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{translateData(line)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50 relative z-10 bg-white group-hover:bg-transparent transition-colors duration-300">
+                  <div className={cn("grid grid-cols-2 gap-3 pt-4 border-t border-slate-50 relative z-10 transition-colors duration-300", dashboardStyle === 'flat' ? "" : "bg-transparent group-hover:bg-transparent")}>
                     <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
                       <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Client Payments</p>
                       <div className="flex flex-col">

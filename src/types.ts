@@ -1,9 +1,13 @@
 export type ProjectStatus = 
   | 'Discussion' 
-  | 'Advance Received' 
-  | 'Construction' 
+  | 'Design & Prep' 
+  | 'In Progress' 
+  | 'Observations'
   | 'Work is on hold' 
-  | 'Completed';
+  | 'Handover'
+  | 'Advance Received' // Kept for legacy compatibility
+  | 'Construction'     // Kept for legacy compatibility
+  | 'Completed';       // Kept for legacy compatibility
 
 export type UserRole = 'admin' | 'employee';
 
@@ -31,6 +35,7 @@ export interface Project {
   assigned_to: string; // User ID or Name
   last_updated: string;
   created_at: string;
+  logo_url?: string;
 }
 
 export interface Task {

@@ -43,6 +43,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
 import { format, parseISO, isValid } from 'date-fns';
 import { getInitials, cn } from '../lib/utils';
+import { useTheme } from '../contexts/ThemeContext';
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return 'N/A';
@@ -63,6 +64,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
   const { user } = useUser();
   const { addNotification } = useNotifications();
   const { t, translateData } = useLanguage();
+  const { getDashboardColors } = useTheme();
+  const themeColors = getDashboardColors();
+  
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,6 +103,35 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
       }
       
       let finalProjects = data || [];
+      
+      // Fetch checklists to calculate execution plan progress
+      const { data: checklistsData } = await supabase
+        .from('project_checklists')
+        .select('project_id, is_completed');
+        
+      if (checklistsData) {
+        const progressMap: Record<string, { total: number, completed: number }> = {};
+        checklistsData.forEach(item => {
+          if (!progressMap[item.project_id]) {
+            progressMap[item.project_id] = { total: 0, completed: 0 };
+          }
+          progressMap[item.project_id].total++;
+          if (item.is_completed) {
+            progressMap[item.project_id].completed++;
+          }
+        });
+        
+        finalProjects = finalProjects.map(p => {
+          const stats = progressMap[p.id];
+          if (stats && stats.total > 0) {
+            return {
+              ...p,
+              progress: Math.round((stats.completed / stats.total) * 100)
+            };
+          }
+          return { ...p, progress: 0 };
+        });
+      }
       
       if (employeeView && user) {
         const { data: userTasks } = await supabase
@@ -198,10 +231,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1 max-w-md">
           <div className="relative w-full group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 transition-colors", `group-focus-within:${themeColors.text}`)} />
             <Input 
               placeholder={t('search_projects')} 
-              className="pl-10 bg-white border-slate-200 rounded-2xl h-11 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className={cn("pl-10 bg-white border-slate-200 rounded-2xl h-11 focus:ring-2 transition-all", `focus:ring-[${themeColors.solid}]/20`)}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -210,7 +243,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
         {!employeeView && (
           <Button 
             onClick={() => setIsNewDialogOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold text-sm transition-all active:scale-95"
+            className={cn("rounded-2xl shadow-lg h-11 px-6 font-bold text-sm transition-all active:scale-95 text-white", themeColors.solid, themeColors.solidHover)}
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('add_project')}
@@ -404,9 +437,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   >
                     <TableCell className="py-5 px-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                          {project.name.charAt(0)}
-                        </div>
+                        {project.logo_url ? (
+                          <img src={project.logo_url} alt="Logo" className="w-9 h-9 rounded-xl object-contain shadow-sm border border-slate-200 bg-white group-hover:border-indigo-200 transition-all" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                            {project.name.charAt(0)}
+                          </div>
+                        )}
                         <span className="font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">{translateData(project.name)}</span>
                       </div>
                     </TableCell>

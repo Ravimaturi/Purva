@@ -25,7 +25,8 @@ import {
   User as UserIcon,
   Calendar as CalendarIcon,
   Paperclip,
-  CheckIcon as CheckSmallIcon
+  CheckIcon as CheckSmallIcon,
+  Upload
 } from 'lucide-react';
 import { Project, Comment, AuditLog, PaymentStage, Task } from '../types';
 import { supabase } from '../lib/supabase';
@@ -58,6 +59,7 @@ import { CalendarView } from './CalendarView';
 import { Lightbulb } from 'lucide-react';
 import { ProjectChecklist } from './ProjectChecklist';
 import { DrawingsTracker } from './DrawingsTracker';
+import { ImageCropperDialog } from './ImageCropperDialog';
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return 'N/A';
@@ -70,6 +72,7 @@ const formatDate = (dateStr: string | null) => {
 };
 
 import { TransactionComments } from './TransactionComments';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ProjectDetailsProps {
   project: Project;
@@ -100,7 +103,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [files, setFiles] = useState<any[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
@@ -115,6 +118,34 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localPaymentAmounts, setLocalPaymentAmounts] = useState<Record<string, string>>({});
   const [localPaymentDates, setLocalPaymentDates] = useState<Record<string, string>>({});
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isCropOpen, setIsCropOpen] = React.useState(false);
+  const [cropImageSrc, setCropImageSrc] = React.useState('');
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo file size must be less than 2MB');
+      return;
+    }
+
+    try {
+      const { fileToBase64 } = await import('../lib/utils');
+      const base64 = await fileToBase64(file);
+      setCropImageSrc(base64);
+      setIsCropOpen(true);
+    } catch (err) {
+      toast.error('Failed to process image');
+    }
+  };
+
+  const handleCropComplete = (croppedBase64: string) => {
+    setEditData(prev => ({ ...prev, logo_url: croppedBase64 }));
+    setCropImageSrc('');
+  };
   
   // File upload state
   const [newFileName, setNewFileName] = useState('');
@@ -499,6 +530,44 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }
   };
 
+  const [isTogglingHold, setIsTogglingHold] = useState(false);
+
+  const toggleHoldStatus = async () => {
+    if (!project) return;
+    setIsTogglingHold(true);
+    try {
+      const newStatus = project.status === 'Work is on hold' ? 'Discussion' : 'Work is on hold'; // Default back to Discussion, the checklist will update it later if needed or they can manually update
+      
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', project.id);
+        
+      if (error) throw error;
+      
+      toast.success(`Project ${newStatus === 'Work is on hold' ? 'put on hold' : 'resumed'}`);
+      
+      await supabase.from('audit_logs').insert({
+        project_id: project.id,
+        user_id: user?.id,
+        user_name: user?.full_name,
+        action: 'Status Change',
+        details: `Project status changed to ${newStatus}`,
+        created_at: new Date().toISOString()
+      });
+      
+      // Update local state quickly
+      setEditData(prev => ({ ...prev, status: newStatus as any }));
+      onUpdate();
+      fetchDetails();
+    } catch (error) {
+      console.error('Error toggling hold:', error);
+      toast.error('Failed to change project status by hold status');
+    } finally {
+      setIsTogglingHold(false);
+    }
+  };
+
   const updatePaymentComments = async (stageId: string, newComments: string) => {
     try {
       const { error } = await supabase.from('payment_stages').update({ comments: newComments }).eq('id', stageId);
@@ -604,6 +673,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const totalReceived = paymentStages.reduce((sum, stage) => sum + (stage.amount_received || 0), 0);
   const totalPending = totalValue - totalReceived;
 
+  const { getDashboardColors } = useTheme();
+  const themeColors = getDashboardColors();
+
   // Combine tasks and comments for Activity tab
   const activityItems = [
     ...tasks.map(t => ({ ...t, activityType: 'task' as const })),
@@ -615,8 +687,31 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       {/* Header */}
       <div className="px-4 sm:px-8 py-3 sm:py-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <div className="w-9 h-9 sm:w-12 sm:h-12 bg-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100 shrink-0">
-            <Briefcase className="w-4 h-4 sm:w-6 sm:h-6" />
+          <div className="relative group">
+            {project.logo_url || editData.logo_url ? (
+              <img src={isEditing ? editData.logo_url : project.logo_url} alt="Project Logo" className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-contain bg-white shadow-sm border border-slate-200 shrink-0" />
+            ) : (
+              <div className={cn("w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0", themeColors.solid)}>
+                <Briefcase className="w-4 h-4 sm:w-6 sm:h-6" />
+              </div>
+            )}
+            
+            {isEditing && (
+              <div 
+                className="absolute inset-0 bg-black/50 rounded-xl sm:rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-col gap-1"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploadingLogo ? (
+                  <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 text-white" />
+                    <span className="text-[8px] text-white font-bold uppercase tracking-wider">Change</span>
+                  </>
+                )}
+              </div>
+            )}
+            {isEditing && <input type="file" ref={fileInputRef} className="hidden" accept="image/png, image/jpeg, image/svg+xml" onChange={handleLogoUpload} />}
           </div>
           <div className="space-y-0.5 min-w-0">
             {isEditing ? (
@@ -637,7 +732,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
               <>
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-sm sm:text-xl font-bold text-slate-900 tracking-tight truncate">{translateData(project.name)}</h2>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-black uppercase text-[7px] sm:text-[9px] px-1.5 sm:px-2 py-0 shrink-0 tracking-tighter">
+                  <Badge variant="outline" className={cn("font-black uppercase text-[7px] sm:text-[9px] px-1.5 sm:px-2 py-0 shrink-0 tracking-tighter", themeColors.bg, themeColors.text, themeColors.border)}>
                     {t(project.status.toLowerCase().replace(/ /g, '_'))}
                   </Badge>
                 </div>
@@ -677,15 +772,27 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 </div>
               ) : (
                 user?.role === 'admin' && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsEditing(true)} 
-                    className="h-7 w-7 sm:w-auto sm:h-9 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2 p-0 sm:px-3"
-                  >
-                    <Edit className="w-3.5 h-3.5 sm:w-4 h-4" />
-                    <span className="hidden lg:inline text-xs font-bold">{t('edit')}</span>
-                  </Button>
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={toggleHoldStatus} 
+                      disabled={isTogglingHold}
+                      className={`h-7 w-7 sm:w-auto sm:h-9 rounded-lg gap-2 p-0 sm:px-3 ${project.status === 'Work is on hold' ? 'text-amber-600 hover:bg-amber-50 hover:text-amber-700' : 'text-slate-500 hover:bg-white hover:shadow-sm'}`}
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 sm:w-4 h-4" />
+                      <span className="hidden lg:inline text-xs font-bold">{project.status === 'Work is on hold' ? 'Resume' : 'Hold'}</span>
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setIsEditing(true)} 
+                      className="h-7 w-7 sm:w-auto sm:h-9 rounded-lg hover:bg-white hover:shadow-sm text-slate-500 gap-2 p-0 sm:px-3"
+                    >
+                      <Edit className="w-3.5 h-3.5 sm:w-4 h-4" />
+                      <span className="hidden lg:inline text-xs font-bold">{t('edit')}</span>
+                    </Button>
+                  </>
                 )
               )}
             </div>
@@ -1267,7 +1374,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   )}
 
                   <TabsContent value="execution-plan" className="mt-0">
-                    <ProjectChecklist projectId={project.id} />
+                    <ProjectChecklist projectId={project.id} onUpdate={() => { fetchDetails(); onUpdate(); }} />
                   </TabsContent>
 
                   <TabsContent value="drawings-tracker" className="mt-0">
@@ -1485,6 +1592,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         title="Delete Project"
         description="Are you sure you want to delete this project? This action cannot be undone and all associated data will be removed."
       />
+      {isCropOpen && (
+        <ImageCropperDialog
+          open={isCropOpen}
+          onOpenChange={setIsCropOpen}
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+        />
+      )}
     </div>
   );
 };

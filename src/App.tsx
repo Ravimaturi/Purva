@@ -5,7 +5,6 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { GlobalKanban } from './components/GlobalKanban';
-import { ProjectKanban } from './components/ProjectKanban';
 import { GlobalCalendar } from './components/GlobalCalendar';
 import { ProjectList } from './components/ProjectList';
 import { TeamManagement } from './components/TeamManagement';
@@ -101,8 +100,6 @@ function MainApp() {
         return <ProjectList onProjectClick={handleProjectClick} />;
       case 'my-projects':
         return <ProjectList employeeView={true} onProjectClick={handleProjectClick} />;
-      case 'project-kanban':
-        return <ProjectKanban onProjectClick={handleProjectClick} />;
       case 'kanban':
         return <GlobalKanban onProjectClick={handleProjectClick} />;
       case 'calendar':
@@ -153,15 +150,19 @@ function MainApp() {
   );
 }
 
+import { ThemeProvider } from './contexts/ThemeContext';
+
 export default function App() {
   return (
-    <LanguageProvider>
-      <UserProvider>
-        <NotificationProvider>
-          <MainApp />
-          <Toaster position="top-right" />
-        </NotificationProvider>
-      </UserProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <UserProvider>
+          <NotificationProvider>
+            <MainApp />
+            <Toaster position="top-right" />
+          </NotificationProvider>
+        </UserProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }

@@ -13,11 +13,13 @@ import {
   X as CloseIcon,
   MoreVertical,
   Building2,
-  Languages
+  Languages,
+  Monitor
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { 
   DropdownMenu, 
@@ -41,6 +43,7 @@ import {
   DialogTitle 
 } from './ui/dialog';
 import { format } from 'date-fns';
+import { AppearanceSettings } from './AppearanceSettings';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -53,6 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t, translateData } = useLanguage();
   const [showHistory, setShowHistory] = React.useState(false);
+  const [showAppearance, setShowAppearance] = React.useState(false);
 
   React.useEffect(() => {
     if (user?.role === 'employee' && activeTab === 'dashboard') {
@@ -63,7 +67,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const navItems = user?.role === 'admin' ? [
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
     { id: 'projects', label: t('projects'), icon: ListTodo },
-    { id: 'project-kanban', label: t('project_status'), icon: Trello },
     { id: 'kanban', label: t('kanban'), icon: Trello },
     { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
     { id: 'vendors', label: t('vendors'), icon: Building2 },
@@ -106,37 +109,48 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     </DropdownMenuContent>
   );
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-6 border-b border-slate-100">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-            P
-          </div>
-          Purva Vedic
-        </h1>
-        <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">{t('project_management')}</p>
-      </div>
-
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
-              activeTab === item.id 
-                ? "bg-indigo-50 text-indigo-700 shadow-sm" 
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+  const SidebarContent = () => {
+    const { getDashboardColors, workspaceName, workspaceLogo } = useTheme();
+    const themeColors = getDashboardColors();
+    
+    return (
+      <div className="flex flex-col h-full">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            {workspaceLogo ? (
+              <img src={workspaceLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+            ) : (
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white", themeColors.solid)}>
+                {workspaceName.charAt(0)}
+              </div>
             )}
-          >
-            <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
-            {item.label}
-          </button>
-        ))}
-      </nav>
-    </div>
-  );
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 line-clamp-2 leading-tight flex-1">
+              {workspaceName}
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-1.5 font-medium uppercase tracking-wider">{t('project_management')}</p>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                activeTab === item.id 
+                  ? cn(themeColors.bg, themeColors.text, "shadow-sm")
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              <item.icon className={cn("w-5 h-5", activeTab === item.id ? themeColors.text : "text-slate-400")} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -170,6 +184,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full text-slate-500 relative mr-1"
+              onClick={() => setShowAppearance(true)}
+            >
+              <Monitor className="h-5 w-5" />
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger 
                 render={
@@ -344,6 +367,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
           {children}
         </div>
+        
+        <AppearanceSettings open={showAppearance} onOpenChange={setShowAppearance} />
       </main>
     </div>
   );
