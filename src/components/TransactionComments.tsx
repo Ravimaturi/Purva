@@ -58,8 +58,8 @@ export const TransactionComments: React.FC<TransactionCommentsProps> = ({ commen
       {comments.length > 0 && (
         <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
           {comments.map(comment => (
-            <div key={comment.id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              <p className="text-xs text-slate-700">{comment.text}</p>
+            <div key={comment.id} className="bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-white/10 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-800">
+              <p className="text-xs text-slate-700 dark:text-zinc-300">{comment.text}</p>
               <div className="flex items-center justify-between mt-1.5">
                 <div className="flex items-center gap-1">
                   <UserIcon className="w-3 h-3 text-slate-400" />
@@ -83,7 +83,7 @@ export const TransactionComments: React.FC<TransactionCommentsProps> = ({ commen
             }
           }}
           placeholder="Add a comment..."
-          className="h-9 text-xs rounded-xl border-slate-200 flex-1"
+          className="h-9 text-xs rounded-xl border-slate-200 dark:border-slate-800 dark:border-slate-800 flex-1"
         />
         <Button 
           onClick={handleAddComment}

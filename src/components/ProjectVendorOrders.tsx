@@ -108,7 +108,7 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Vendor Orders</h3>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100 uppercase tracking-widest">Vendor Orders</h3>
         <Button onClick={() => setIsAddOpen(true)} size="sm" className="bg-indigo-600 rounded-xl font-bold">
           <Plus className="w-4 h-4 mr-2" />
           Add Order
@@ -120,14 +120,14 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
           const vendor = vendors.find(v => v.id === order.vendor_id);
           
           return (
-            <div key={order.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div key={order.id} className="bg-white dark:bg-[#121212] p-5 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-[#0a0a0a] flex items-center justify-center text-slate-600 dark:text-zinc-400">
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900">{vendor?.vendor_name || 'Unknown Vendor'}</h4>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{vendor?.vendor_name || 'Unknown Vendor'}</h4>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter">
                         {order.status}
@@ -151,7 +151,7 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
               </div>
               
               <div className="mb-4">
-                <p className="text-sm text-slate-700">{order.order_details}</p>
+                <p className="text-sm text-slate-700 dark:text-zinc-300">{order.order_details}</p>
                 {order.terms && (
                   <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
                     <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">Terms & Conditions</p>
@@ -163,7 +163,7 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-50">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
-                  <p className="font-bold text-slate-900">₹{order.total_amount.toLocaleString()}</p>
+                  <p className="font-bold text-slate-900 dark:text-slate-100">₹{order.total_amount.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Amount Paid</p>
@@ -172,7 +172,7 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
                       type="number"
                       value={order.amount_paid}
                       onChange={(e) => updateOrderAmountPaid(order.id, Number(e.target.value) || 0)}
-                      className="h-8 w-32 text-sm font-bold text-emerald-600 rounded-lg border-slate-200"
+                      className="h-8 w-32 text-sm font-bold text-emerald-600 rounded-lg border-slate-200 dark:border-slate-800 dark:border-slate-800"
                     />
                     {order.amount_paid >= order.total_amount && order.total_amount > 0 && (
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -191,9 +191,9 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
           );
         })}
         {projectOrders.length === 0 && (
-          <div className="text-center py-12 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+          <div className="text-center py-12 bg-slate-50 dark:bg-slate-950/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-900">No vendor orders</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">No vendor orders</p>
             <p className="text-xs text-slate-500 mt-1">Track orders and payments to vendors for this project.</p>
           </div>
         )}

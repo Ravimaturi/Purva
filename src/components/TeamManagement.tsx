@@ -182,7 +182,7 @@ export const TeamManagement: React.FC = () => {
         <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600">
           <Shield className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900">Access Denied</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100">Access Denied</h2>
         <p className="text-slate-500 max-w-md">
           You do not have permission to access the Team Management panel. Please contact an administrator if you believe this is an error.
         </p>
@@ -193,7 +193,7 @@ export const TeamManagement: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('team')}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('team')}</h2>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1 max-w-md">
@@ -201,7 +201,7 @@ export const TeamManagement: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
               placeholder={t('search_team')} 
-              className="pl-10 bg-white border-slate-200 rounded-xl"
+              className="pl-10 bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-white/10 border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-xl"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -209,7 +209,7 @@ export const TeamManagement: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <Button 
-            className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100 gap-2"
+            className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm dark:shadow-none gap-2"
             onClick={() => {
               setSelectedUser(null);
               setEditData({ full_name: '', email: '', role: 'employee', emp_code: '', designation: '', DOJ: '' });
@@ -222,10 +222,10 @@ export const TeamManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/50">
-            <TableRow className="hover:bg-transparent border-slate-100">
+          <TableHeader className="bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-slate-800/50">
+            <TableRow className="hover:bg-transparent border-slate-100 dark:border-slate-800">
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                 <div className="flex items-center gap-2">
                   {t('member')}
@@ -301,21 +301,21 @@ export const TeamManagement: React.FC = () => {
           </TableHeader>
           <TableBody>
             {filteredUsers.map((u) => (
-              <TableRow key={u.id} className="hover:bg-slate-50/50 border-slate-50 group">
+              <TableRow key={u.id} className="hover:bg-slate-50 dark:bg-slate-950/50 border-slate-50 group">
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border border-slate-200">
+                    <Avatar className="h-10 w-10 border border-slate-200 dark:border-slate-800">
                       <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">{getInitials(u.full_name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900">{translateData(u.full_name)}</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{translateData(u.full_name)}</span>
                       {u.id === currentUser?.id && (
                         <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-tighter">You</span>
                       )}
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-slate-600 font-bold">
+                <TableCell className="text-sm text-slate-600 dark:text-slate-400 font-bold">
                   {u.emp_code || 'N/A'}
                 </TableCell>
                 <TableCell className="text-sm text-slate-500 font-medium italic">
@@ -335,7 +335,7 @@ export const TeamManagement: React.FC = () => {
                         <span className="text-[10px] font-bold uppercase tracking-wider">ADMIN</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full border border-slate-100">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-slate-950 text-slate-600 rounded-full border border-slate-100 dark:border-slate-800">
                         <UserIcon className="w-3 h-3" />
                         <span className="text-[10px] font-bold uppercase tracking-wider">EMPLOYEE</span>
                       </div>
@@ -395,7 +395,7 @@ export const TeamManagement: React.FC = () => {
               <Input 
                 id="full_name" 
                 required 
-                className="rounded-xl border-slate-200"
+                className="rounded-xl border-slate-200 dark:border-slate-800"
                 value={editData.full_name}
                 onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
               />
@@ -406,7 +406,7 @@ export const TeamManagement: React.FC = () => {
                 id="email" 
                 type="email"
                 required 
-                className="rounded-xl border-slate-200"
+                className="rounded-xl border-slate-200 dark:border-slate-800"
                 value={editData.email}
                 onChange={(e) => setEditData({ ...editData, email: e.target.value })}
               />
@@ -416,7 +416,7 @@ export const TeamManagement: React.FC = () => {
                 <Label htmlFor="emp_code" className="text-xs font-bold uppercase tracking-widest text-slate-400">EMP Code</Label>
                 <Input 
                   id="emp_code" 
-                  className="rounded-xl border-slate-200"
+                  className="rounded-xl border-slate-200 dark:border-slate-800"
                   value={editData.emp_code}
                   onChange={(e) => setEditData({ ...editData, emp_code: e.target.value })}
                 />
@@ -425,7 +425,7 @@ export const TeamManagement: React.FC = () => {
                 <Label htmlFor="designation" className="text-xs font-bold uppercase tracking-widest text-slate-400">Designation</Label>
                 <Input 
                   id="designation" 
-                  className="rounded-xl border-slate-200"
+                  className="rounded-xl border-slate-200 dark:border-slate-800"
                   value={editData.designation}
                   onChange={(e) => setEditData({ ...editData, designation: e.target.value })}
                 />
@@ -436,7 +436,7 @@ export const TeamManagement: React.FC = () => {
               <Input 
                 id="DOJ" 
                 type="date"
-                className="rounded-xl border-slate-200"
+                className="rounded-xl border-slate-200 dark:border-slate-800"
                 value={editData.DOJ}
                 onChange={(e) => setEditData({ ...editData, DOJ: e.target.value })}
               />
@@ -447,7 +447,7 @@ export const TeamManagement: React.FC = () => {
                 value={editData.role} 
                 onValueChange={(v) => setEditData({ ...editData, role: v as UserRole })}
               >
-                <SelectTrigger className="rounded-xl border-slate-200">
+                <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-800">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -467,7 +467,7 @@ export const TeamManagement: React.FC = () => {
               </Button>
               <Button 
                 type="submit" 
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-8 shadow-lg shadow-indigo-100"
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-8 shadow-sm dark:shadow-none"
               >
                 {selectedUser ? 'Save Changes' : 'Add Member'}
               </Button>

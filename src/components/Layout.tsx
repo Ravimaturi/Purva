@@ -78,9 +78,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   ];
 
   const UserMenuContent = () => (
-    <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 p-2">
+    <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 dark:border-white/10 dark:border-slate-800 p-2">
       <div className="px-2 py-2 mb-1">
-        <p className="text-sm font-bold text-slate-900">{user?.full_name}</p>
+        <p className="text-sm font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100">{user?.full_name}</p>
         <div className="flex flex-col mt-1">
           <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{translateData(user?.designation || 'N/A')}</p>
           <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{t(user?.role || '')}</p>
@@ -115,16 +115,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     
     return (
       <div className="flex flex-col h-full">
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800">
           <div className="flex items-center gap-3">
             {workspaceLogo ? (
-              <img src={workspaceLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+              <img src={workspaceLogo} alt="Logo" className="h-8 max-w-[120px] object-contain object-left" />
             ) : (
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white", themeColors.solid)}>
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white", themeColors.solid)}>
                 {workspaceName.charAt(0)}
               </div>
             )}
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 line-clamp-2 leading-tight flex-1">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 line-clamp-2 leading-tight flex-1">
               {workspaceName}
             </h1>
           </div>
@@ -139,8 +139,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                 activeTab === item.id 
-                  ? cn(themeColors.bg, themeColors.text, "shadow-sm")
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  ? cn(themeColors.bg, themeColors.text, "shadow-sm border dark:border-white/5")
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 dark:border-transparent hover:text-slate-900 dark:hover:text-slate-100 border border-transparent"
               )}
             >
               <item.icon className={cn("w-5 h-5", activeTab === item.id ? themeColors.text : "text-slate-400")} />
@@ -153,16 +153,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
+      <aside className="hidden lg:flex w-64 bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 border-r border-slate-200 dark:border-slate-800 flex-col shrink-0">
         <SidebarContent />
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
             {/* Mobile Menu Trigger */}
             <Sheet>
@@ -178,7 +178,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               </SheetContent>
             </Sheet>
             
-            <h2 className="text-lg font-semibold text-slate-800 capitalize">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 capitalize">
               {t(activeTab.replace('-', '_'))}
             </h2>
           </div>
@@ -201,7 +201,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end" className="w-32 rounded-xl shadow-lg border-slate-200 p-1">
+              <DropdownMenuContent align="end" className="w-32 rounded-xl shadow-lg border-slate-200 dark:border-slate-800 p-1">
                 <DropdownMenuItem 
                   onClick={() => setLanguage('en')}
                   className={cn("rounded-lg text-xs font-bold", language === 'en' && "bg-indigo-50 text-indigo-700")}
@@ -228,13 +228,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end" className="w-80 rounded-xl shadow-lg border-slate-200 p-0 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <h3 className="font-bold text-sm text-slate-900">Notifications</h3>
+              <DropdownMenuContent align="end" className="w-80 rounded-xl shadow-lg border-slate-200 dark:border-slate-800 p-0 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Notifications</h3>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => setShowHistory(true)}
-                      className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hover:text-slate-700"
+                      className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hover:text-slate-700 dark:text-zinc-300"
                     >
                       History
                     </button>
@@ -255,7 +255,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                         <div 
                           key={n.id} 
                           className={cn(
-                            "p-4 hover:bg-slate-50 transition-colors cursor-pointer relative",
+                            "p-4 hover:bg-slate-50 dark:bg-slate-950 transition-colors cursor-pointer relative",
                             !n.read && "bg-indigo-50/30"
                           )}
                           onClick={() => markAsRead(n.id)}
@@ -263,7 +263,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                           {!n.read && (
                             <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-full" />
                           )}
-                          <p className="text-sm font-bold text-slate-900">{n.title}</p>
+                          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{n.title}</p>
                           <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
                           <p className="text-[10px] text-slate-400 mt-2 font-medium">
                             {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -273,10 +273,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                     </div>
                   ) : (
                     <div className="text-center py-12">
-                      <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-3">
                         <Bell className="w-6 h-6 text-slate-300" />
                       </div>
-                      <p className="text-sm font-bold text-slate-900">No notifications</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">No notifications</p>
                       <p className="text-xs text-slate-500 mt-1">We'll notify you when something happens.</p>
                     </div>
                   )}
@@ -287,16 +287,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
 
             {/* Profile Button in Header */}
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100">
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-100 dark:border-slate-800">
               <DropdownMenu>
                 <DropdownMenuTrigger 
                   render={
-                    <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-10 rounded-xl hover:bg-slate-50 transition-all">
-                      <Avatar className="h-8 w-8 border border-slate-200">
+                    <Button variant="ghost" className="flex items-center gap-2 px-2 py-1 h-10 rounded-xl hover:bg-slate-50 dark:bg-slate-950 transition-all">
+                      <Avatar className="h-8 w-8 border border-slate-200 dark:border-slate-800">
                         <AvatarFallback className="bg-indigo-600 text-white font-bold text-[10px]">{getInitials(user?.full_name || '')}</AvatarFallback>
                       </Avatar>
                       <div className="hidden md:flex flex-col items-start text-left">
-                        <p className="text-xs font-bold text-slate-900 leading-none">{user?.full_name}</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none">{user?.full_name}</p>
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role}</p>
                       </div>
                     </Button>
@@ -312,7 +312,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 <DropdownMenuTrigger 
                   render={
                     <Button variant="ghost" size="icon" className="rounded-full">
-                      <Avatar className="h-8 w-8 border border-slate-200">
+                      <Avatar className="h-8 w-8 border border-slate-200 dark:border-slate-800">
                         <AvatarFallback className="bg-indigo-600 text-white font-bold text-[10px]">{getInitials(user?.full_name || '')}</AvatarFallback>
                       </Avatar>
                     </Button>
@@ -327,20 +327,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         {/* Notification History Dialog */}
         <Dialog open={showHistory} onOpenChange={setShowHistory}>
           <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col p-0 overflow-hidden rounded-3xl">
-            <DialogHeader className="p-6 border-b border-slate-100 bg-slate-50/50">
-              <DialogTitle className="text-xl font-bold text-slate-900">Notification History</DialogTitle>
+            <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+              <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100">Notification History</DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto p-6">
               {notifications.length > 0 ? (
                 <div className="space-y-4">
                   {notifications.map((n) => (
-                    <div key={n.id} className="flex gap-4 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    <div key={n.id} className="flex gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
                       <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
                         <Bell className="w-5 h-5 text-indigo-600" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
-                          <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{n.title}</h4>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                             {format(new Date(n.created_at), 'MMM d, yyyy h:mm a')}
                           </span>
@@ -352,10 +352,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 </div>
               ) : (
                 <div className="text-center py-16">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Bell className="w-8 h-8 text-slate-300" />
                   </div>
-                  <p className="text-lg font-bold text-slate-900">No history</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">No history</p>
                   <p className="text-sm text-slate-500 mt-1">You don't have any notifications yet.</p>
                 </div>
               )}

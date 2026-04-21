@@ -158,20 +158,20 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Vendor Management</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">Vendor Management</h2>
         <div className="flex items-center gap-4">
           <div className="relative w-full sm:w-64 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors" />
             <Input 
               placeholder="Search vendors..." 
-              className="pl-10 bg-white border-slate-200 rounded-2xl h-11"
+              className="pl-10 bg-white dark:bg-[#121212] dark:border-white/10 dark:text-zinc-100 border-slate-200 rounded-2xl h-11"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <Button 
             onClick={() => setIsAddVendorOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 h-11 px-6 font-bold"
+            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Vendor
@@ -186,15 +186,15 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
           const totalCommitted = vendorOrders.reduce((sum, o) => sum + o.total_amount, 0);
 
           return (
-            <div key={vendor.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all">
+            <div key={vendor.id} className="bg-white dark:bg-[#121212] rounded-3xl p-6 border border-slate-100 dark:border-white/10 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                     <Building2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-lg">{vendor.vendor_name}</h3>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{vendor.services_list}</p>
+                    <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-lg">{vendor.vendor_name}</h3>
+                    <p className="text-xs font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">{vendor.services_list}</p>
                   </div>
                 </div>
                 {user?.role === 'admin' && (
@@ -203,7 +203,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                       variant="ghost"
                       size="icon"
                       onClick={() => handleEditClick(vendor)}
-                      className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
+                      className="h-8 w-8 text-slate-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-full"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -211,7 +211,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteClick(vendor)}
-                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                      className="h-8 w-8 text-slate-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -220,17 +220,17 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
                   <Phone className="w-4 h-4 text-slate-400" />
                   {vendor.phone_no} {vendor.contact_person_name ? `(${vendor.contact_person_name})` : ''}
                 </div>
                 {(vendor.pan_card_no || vendor.gst_no) && (
-                  <div className="flex flex-col gap-1 text-xs text-slate-500">
-                    {vendor.pan_card_no && <span>PAN: <span className="font-mono text-slate-700">{vendor.pan_card_no}</span></span>}
-                    {vendor.gst_no && <span>GST: <span className="font-mono text-slate-700">{vendor.gst_no}</span></span>}
+                  <div className="flex flex-col gap-1 text-xs text-slate-500 dark:text-zinc-500">
+                    {vendor.pan_card_no && <span>PAN: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.pan_card_no}</span></span>}
+                    {vendor.gst_no && <span>GST: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.gst_no}</span></span>}
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
                   <Briefcase className="w-4 h-4 text-slate-400" />
                   {vendorOrders.length} Orders
                 </div>
@@ -247,7 +247,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                         <Badge 
                           key={projectId} 
                           variant="secondary" 
-                          className="bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 cursor-pointer transition-colors flex items-center gap-1"
+                          className="bg-slate-100 dark:bg-[#181818] border dark:border-white/10 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-slate-700 dark:text-zinc-300 hover:text-indigo-700 dark:hover:text-indigo-400 cursor-pointer transition-colors flex items-center gap-1"
                           onClick={() => onProjectClick?.(project, 'vendors')}
                         >
                           {project.name}
@@ -259,24 +259,24 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-[#0a0a0a] dark:border-white/10 rounded-2xl">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Committed</p>
-                  <p className="font-bold text-slate-900">₹{totalCommitted.toLocaleString()}</p>
+                  <p className="font-bold text-slate-900 dark:text-zinc-100">₹{totalCommitted.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Paid</p>
-                  <p className="font-bold text-emerald-600">₹{totalSpent.toLocaleString()}</p>
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400">₹{totalSpent.toLocaleString()}</p>
                 </div>
               </div>
             </div>
           );
         })}
         {filteredVendors.length === 0 && (
-          <div className="col-span-full text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
-            <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-lg font-bold text-slate-900">No vendors found</p>
-            <p className="text-sm text-slate-500 mt-1">Add your first vendor to start tracking orders.</p>
+          <div className="col-span-full text-center py-12 bg-white dark:bg-[#121212] rounded-3xl border border-dashed border-slate-200 dark:border-white/10">
+            <Building2 className="w-12 h-12 text-slate-300 dark:text-zinc-700 mx-auto mb-3" />
+            <p className="text-lg font-bold text-slate-900 dark:text-zinc-100">No vendors found</p>
+            <p className="text-sm text-slate-500 dark:text-zinc-500 mt-1">Add your first vendor to start tracking orders.</p>
           </div>
         )}
       </div>

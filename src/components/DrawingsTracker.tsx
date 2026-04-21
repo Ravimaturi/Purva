@@ -190,10 +190,10 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
 
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
         <FolderOpen className="w-12 h-12 text-slate-400 mb-4" />
-        <h3 className="text-lg font-bold text-slate-900 mb-2">OneDrive Integration</h3>
-        <p className="text-sm text-slate-500 text-center max-w-md mb-6">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-2">OneDrive Integration</h3>
+        <p className="text-sm text-slate-500 dark:text-zinc-400 text-center max-w-md mb-6">
           Sign in with your Microsoft account to access, upload, and manage project drawings and files directly from OneDrive.
         </p>
         <Button onClick={handleLogin} disabled={inProgress !== "none"} className="bg-[#0078D4] hover:bg-[#006CBF] text-white">
@@ -214,8 +214,8 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Project Files</h3>
-          <p className="text-sm text-slate-500">Manage project drawings and documents</p>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Project Files</h3>
+          <p className="text-sm text-slate-500 dark:text-zinc-400">Manage project drawings and documents</p>
         </div>
         <div className="relative">
           <input
@@ -233,40 +233,40 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       </div>
 
       {projectFiles.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+        <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
           <FileIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-bold text-slate-900">No files uploaded yet</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">No files uploaded yet</p>
           <p className="text-xs text-slate-500 mt-1">Upload DWG, PDF, or image files to get started.</p>
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                <tr className="bg-slate-50 dark:bg-[#181818] border-b border-slate-200 dark:border-white/10 text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-500 font-bold">
                   <th className="p-4 rounded-tl-2xl">File Name</th>
                   <th className="p-4">Uploaded By</th>
                   <th className="p-4">Date Uploaded</th>
                   <th className="p-4 text-right rounded-tr-2xl">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                 {projectFiles.map((file) => {
                   const uploader = allUsers.find(u => u.id === file.uploaded_by);
                   const uploaderName = uploader?.full_name || 'Unknown User';
                   
                   return (
-                  <tr key={file.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={file.id} className="hover:bg-slate-50 dark:hover:bg-[#181818] transition-colors group">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-[#0a0a0a] flex items-center justify-center shrink-0 border border-slate-100 dark:border-white/10">
                           {getFileIcon(undefined, file.name)}
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-900 line-clamp-1" title={file.name}>
+                          <span className="text-sm font-bold text-slate-900 dark:text-zinc-100 line-clamp-1" title={file.name}>
                             {file.name}
                           </span>
-                          <span className="text-xs text-slate-500 uppercase tracking-wider mt-0.5">
+                          <span className="text-xs text-slate-500 dark:text-zinc-500 uppercase tracking-wider mt-0.5">
                             {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
                           </span>
                         </div>
@@ -274,15 +274,15 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                        <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">
                           {uploaderName.charAt(0)}
                         </div>
-                        <span className="text-sm font-medium text-slate-700">
+                        <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">
                           {uploaderName}
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-slate-600">
+                    <td className="p-4 text-sm text-slate-600 dark:text-zinc-400">
                       {formatDate(file.created_at)}
                     </td>
                     <td className="p-4 text-right">

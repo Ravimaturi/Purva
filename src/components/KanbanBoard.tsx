@@ -64,9 +64,9 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onClick }) =>
       {...attributes}
       {...listeners}
       onClick={() => onClick?.(task)}
-      className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all group cursor-grab active:cursor-grabbing hover:-translate-y-1 active:scale-95"
+      className="bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-white/10 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 dark:border-slate-800 hover:shadow-xl transition-all group cursor-grab active:cursor-grabbing hover:-translate-y-1 active:scale-95"
     >
-      <h4 className="text-sm font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">{translateData(task.title)}</h4>
+      <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100 mb-1 group-hover:text-indigo-600 transition-colors">{translateData(task.title)}</h4>
       {task.projects?.name && (
         <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter mb-3 bg-indigo-50 w-fit px-2 py-0.5 rounded-full">
           {translateData(task.projects.name)}
@@ -120,7 +120,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange,
   );
 
   const columns: { title: string; status: Task['status']; icon: any; color: string }[] = [
-    { title: 'To Do', status: 'Todo', icon: Circle, color: 'bg-slate-100 text-slate-600' },
+    { title: 'To Do', status: 'Todo', icon: Circle, color: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
     { title: 'In Progress', status: 'In Progress', icon: Clock, color: 'bg-indigo-50 text-indigo-600' },
     { title: 'Completed', status: 'Completed', icon: CheckCircle2, color: 'bg-emerald-50 text-emerald-600' }
   ];
@@ -177,7 +177,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange,
                 <column.icon className="w-4 h-4" />
                 {translateData(column.title)}
               </div>
-              <span className="bg-white/40 px-2.5 py-0.5 rounded-full text-[10px]">
+              <span className="bg-white dark:bg-slate-900/40 px-2.5 py-0.5 rounded-full text-[10px]">
                 {tasks.filter(t => t.status === column.status).length}
               </span>
             </div>
@@ -187,12 +187,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange,
               items={tasks.filter(t => t.status === column.status).map(t => t.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="flex-1 bg-slate-50/40 rounded-[32px] p-4 space-y-4 border border-slate-100/50 backdrop-blur-sm">
+              <div className="flex-1 bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-slate-800/40 rounded-[32px] p-4 space-y-4 border border-slate-100 dark:border-slate-800/50 backdrop-blur-sm">
                 {tasks.filter(t => t.status === column.status).map((task) => (
                   <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} />
                 ))}
                 {tasks.filter(t => t.status === column.status).length === 0 && (
-                  <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/30">
+                  <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900/30">
                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Drop tasks here</p>
                   </div>
                 )}
@@ -204,8 +204,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange,
 
       <DragOverlay>
         {activeId ? (
-          <div className="bg-white p-4 rounded-xl shadow-xl border-2 border-indigo-500 scale-105 rotate-2">
-            <h4 className="text-sm font-bold text-slate-900">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-xl border-2 border-indigo-500 scale-105 rotate-2">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
               {translateData(tasks.find(t => t.id === activeId)?.title || '')}
             </h4>
           </div>

@@ -414,9 +414,9 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-        <h3 className="text-lg font-bold text-slate-900 mb-2">Generate Execution Plan</h3>
-        <p className="text-sm text-slate-500 text-center max-w-md mb-6">
+      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-2">Generate Execution Plan</h3>
+        <p className="text-sm text-slate-500 dark:text-zinc-400 text-center max-w-md mb-6">
           Create a detailed, phased checklist for this project based on the construction material.
         </p>
         
@@ -430,7 +430,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
               onChange={() => setMaterialType('stone')}
               className="text-indigo-600 focus:ring-indigo-500"
             />
-            <span className="text-sm font-medium text-slate-700">Stone</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">Stone</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input 
@@ -481,14 +481,14 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
   return (
     <div className="space-y-8">
       {/* Overall Progress */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-end mb-2">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Overall Execution Progress</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Overall Execution Progress</h3>
             <p className="text-xs text-slate-500">{completedItems} of {totalItems} tasks completed</p>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={downloadReport} className={cn("hover:bg-slate-50", themeColors.text, themeColors.border)}>
+            <Button variant="outline" size="sm" onClick={downloadReport} className={cn("hover:bg-slate-50 dark:bg-slate-950", themeColors.text, themeColors.border)}>
               <Download className="w-4 h-4 mr-2" />
               Report
             </Button>
@@ -499,7 +499,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
             <span className={cn("text-2xl font-black", themeColors.text)}>{progressPercentage}%</span>
           </div>
         </div>
-        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
           <div 
             className={cn("h-3 rounded-full transition-all duration-500 ease-out", themeColors.solid)} 
             style={{ width: `${progressPercentage}%` }}
@@ -524,24 +524,24 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
         if (category === 'Observations') stage = 'Observations';
 
         return (
-          <div key={category} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+          <div key={category} className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden">
+            <div className="bg-slate-50 dark:bg-[#181818] px-4 py-3 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
               <div>
-                <h4 className="font-bold text-slate-900">{category}</h4>
+                <h4 className="font-bold text-slate-900 dark:text-zinc-100">{category}</h4>
                 <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">{stage}</p>
               </div>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10 px-2 py-1 rounded-md">
                 {catCompleted} / {catTotal}
               </span>
             </div>
             
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-white/5">
               {categoryItems.sort((a, b) => a.order_index - b.order_index).map(item => {
                 const isClientTask = item.task_name.startsWith('Client');
                 const audit = itemAudits[item.id];
 
                 return (
-                  <div key={item.id} className={`flex items-center justify-between p-3 transition-colors group ${isClientTask ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-slate-50'}`}>
+                  <div key={item.id} className={`flex items-center justify-between p-3 transition-colors group ${isClientTask ? 'bg-amber-50/50 hover:bg-amber-50 dark:bg-amber-500/5 dark:hover:bg-amber-500/10' : 'hover:bg-slate-50 dark:hover:bg-[#181818]'}`}>
                     <div 
                       className="flex items-center gap-3 flex-1 cursor-pointer"
                       onClick={() => toggleItem(item.id, item.is_completed, item.task_name)}
@@ -553,17 +553,17 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
                       )}
                       
                       <div className="flex flex-col">
-                        <span className={`text-sm ${item.is_completed ? 'text-slate-400 line-through' : (isClientTask ? 'text-amber-900 font-bold' : 'text-slate-700 font-medium')}`}>
+                        <span className={`text-sm ${item.is_completed ? 'text-slate-400 dark:text-zinc-600 line-through' : (isClientTask ? 'text-amber-900 dark:text-amber-100 font-bold' : 'text-slate-700 dark:text-zinc-200 font-medium')}`}>
                           {item.task_name}
                         </span>
                         
                         {item.is_completed && audit && (
                           <div className="flex items-center gap-2 mt-1">
-                            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-100 dark:bg-white/5 dark:text-zinc-400 px-1.5 py-0.5 rounded">
                               <UserIcon className="w-3 h-3" />
                               {audit.user_name}
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400 dark:text-zinc-500">
                               <Clock className="w-3 h-3" />
                               {format(new Date(audit.created_at), 'MMM d, h:mm a')}
                             </div>
@@ -575,14 +575,14 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
                       <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => moveItem(item, 'up')}
-                          className="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                          className="p-0.5 text-slate-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                           title="Move Up"
                         >
                           <ArrowUp className="w-3 h-3" />
                         </button>
                         <button 
                           onClick={() => moveItem(item, 'down')}
-                          className="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                          className="p-0.5 text-slate-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                           title="Move Down"
                         >
                           <ArrowDown className="w-3 h-3" />
@@ -592,12 +592,12 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
                         type="date"
                         value={item.entry_date || ''}
                         onChange={(e) => updateEntryDate(item.id, e.target.value)}
-                        className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-500 focus:outline-none focus:border-indigo-500 bg-transparent hover:bg-white transition-colors"
+                        className="text-xs border border-slate-200 dark:border-white/10 rounded px-2 py-1 text-slate-500 focus:outline-none focus:border-indigo-500 bg-transparent hover:bg-white dark:hover:bg-[#121212] transition-colors"
                         title="Entry Date (Completion Date)"
                       />
                       <button 
                         onClick={() => setItemToDelete(item.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -608,7 +608,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
             </div>
 
             {/* Add Custom Task */}
-            <div className="p-3 bg-slate-50/50 border-t border-slate-100">
+            <div className="p-3 bg-slate-50 dark:bg-[#181818] border-t border-slate-100 dark:border-white/10">
               {addingToCategory === category ? (
                 <div className="flex items-center gap-2">
                   <input
@@ -616,7 +616,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
                     value={newTaskName}
                     onChange={(e) => setNewTaskName(e.target.value)}
                     placeholder="Enter custom task name..."
-                    className="flex-1 text-sm px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 text-sm px-3 py-1.5 border border-slate-200 dark:border-white/10 dark:bg-[#121212] dark:text-zinc-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') addCustomTask(category, stage);
                       if (e.key === 'Escape') {

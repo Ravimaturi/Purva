@@ -335,12 +335,12 @@ export const Dashboard: React.FC = () => {
   };
 
   const stats = [
-    { label: t('all_projects'), value: projects.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: t('discussion'), value: projects.filter(p => p.status === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: t('design_and_prep'), value: projects.filter(p => p.status === 'Advance Received').length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: t('in_progress'), value: projects.filter(p => p.status === 'Construction').length, icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: t('on_hold'), value: projects.filter(p => p.status === 'Work is on hold').length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
-    { label: t('handover'), value: projects.filter(p => p.status === 'Completed').length, icon: CheckCircle2, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { label: t('all_projects'), value: projects.length, icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { label: t('discussion'), value: projects.filter(p => p.status === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { label: t('design_and_prep'), value: projects.filter(p => p.status === 'Advance Received').length, icon: Clock, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { label: t('in_progress'), value: projects.filter(p => p.status === 'Construction').length, icon: HardHat, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { label: t('on_hold'), value: projects.filter(p => p.status === 'Work is on hold').length, icon: AlertCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-500/10' },
+    { label: t('handover'), value: projects.filter(p => p.status === 'Completed').length, icon: CheckCircle2, color: 'text-slate-600 dark:text-zinc-400', bg: 'bg-slate-100 dark:bg-white/5' },
   ];
 
   const filteredProjects = filterStatus 
@@ -351,7 +351,7 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t('dashboard')}</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100 tracking-tight">{t('dashboard')}</h1>
           <p className="text-slate-500 text-sm sm:text-base">
             Welcome back, <span className="text-indigo-600 font-bold">{user?.full_name}</span>! Here's your project overview.
           </p>
@@ -372,7 +372,7 @@ export const Dashboard: React.FC = () => {
                 variant="default" 
                 size="sm"
                 onClick={() => setIsNewDialogOpen(true)}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-10 px-6 font-bold text-xs"
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200/50 dark:shadow-none h-10 px-6 font-bold text-xs"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 {t('add_project')}
@@ -406,14 +406,14 @@ export const Dashboard: React.FC = () => {
             onClick={() => setFilterStatus(stat.label === t('all_projects') ? null : stat.label)}
             className={cn(
               "border-none shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1 active:scale-95 group",
-              filterStatus === stat.label ? "ring-2 ring-indigo-500 bg-indigo-50/30" : "bg-white"
+              filterStatus === stat.label ? "ring-2 ring-indigo-500 bg-indigo-50/30" : "bg-white dark:bg-[#121212]"
             )}
           >
             <CardContent className="p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">{stat.label}</p>
-                  <h3 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter">{stat.value}</h3>
+                  <h3 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-zinc-100 tracking-tighter">{stat.value}</h3>
                 </div>
                 <div className={cn(stat.bg, "p-3 rounded-2xl shrink-0 self-start sm:self-center transition-transform group-hover:scale-110")}>
                   <stat.icon className={cn("w-5 h-5 sm:w-6 sm:h-6", stat.color)} />
@@ -427,7 +427,7 @@ export const Dashboard: React.FC = () => {
       {/* Highlighted Projects Grid */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-indigo-600" />
             {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
           </h2>
@@ -437,8 +437,8 @@ export const Dashboard: React.FC = () => {
               size="sm" 
               onClick={() => setIsPrivacyMode(!isPrivacyMode)} 
               className={cn(
-                "h-8 text-xs font-bold rounded-xl border-slate-200 transition-colors",
-                isPrivacyMode ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white border-slate-800" : "bg-white text-slate-600 hover:bg-slate-50"
+                "h-8 text-xs font-bold rounded-xl border-slate-200 dark:border-white/10 transition-colors",
+                isPrivacyMode ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white border-slate-800" : "bg-white dark:bg-[#121212] text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
               )}
             >
               {isPrivacyMode ? <EyeOff className="w-3.5 h-3.5 mr-1.5" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
@@ -454,7 +454,7 @@ export const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.length === 0 ? (
-            <div className="col-span-full text-center py-16 text-slate-400 text-sm font-medium bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+            <div className="col-span-full text-center py-16 text-slate-400 text-sm font-medium bg-slate-50 dark:bg-slate-950 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
               No projects found.
             </div>
           ) : (
@@ -524,13 +524,13 @@ export const Dashboard: React.FC = () => {
 
               const colorTheme = getProjectColors(index);
 
-              let cardStyleClass = "bg-white border-slate-100 shadow-xl border";
+              let cardStyleClass = "bg-white dark:bg-[#121212] border-slate-100 dark:border-white/10 shadow-xl border";
               if (dashboardStyle === 'flat') {
                 cardStyleClass = `${colorTheme.bg} border-none shadow-sm hover:shadow-md`;
               } else if (dashboardStyle === 'border') {
-                cardStyleClass = `bg-white border-2 hover:border-[3px] shadow-none ${colorTheme.border}`;
+                cardStyleClass = `bg-white dark:bg-[#121212] border-2 hover:border-[3px] shadow-none ${colorTheme.border}`;
               } else if (dashboardStyle === 'glass') {
-                cardStyleClass = `bg-gradient-to-br from-white/60 to-white/30 backdrop-blur-md border border-white/40 shadow-xl`;
+                cardStyleClass = `bg-gradient-to-br from-white/60 to-white/30 backdrop-blur-md border border-white/40 shadow-xl dark:from-white/5 dark:to-transparent dark:border-white/10`;
               }
 
               return (
@@ -548,14 +548,14 @@ export const Dashboard: React.FC = () => {
                   <div className={cn("flex items-start justify-between relative z-10 transition-colors rounded-xl", dashboardStyle === 'flat' ? "" : "bg-transparent group-hover:bg-transparent")}>
                     <div className="flex items-center gap-4 min-w-0">
                       {project.logo_url ? (
-                        <img src={project.logo_url} alt="Logo" className={cn("w-12 h-12 rounded-2xl object-contain shadow-sm shrink-0 transition-transform group-hover:scale-105 bg-white border border-slate-100", dashboardStyle === 'flat' ? "" : `ring-1 ring-slate-100`)} />
+                        <img src={project.logo_url} alt="Logo" className={cn("w-12 h-12 rounded-2xl object-contain shadow-sm shrink-0 transition-transform group-hover:scale-105 bg-white dark:bg-[#181818] border border-slate-100 dark:border-white/10", dashboardStyle === 'flat' ? "" : `ring-1 ring-slate-100 dark:ring-white/10`)} />
                       ) : (
-                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white")}>
+                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 transition-colors", colorTheme.bg, colorTheme.text, colorTheme.hoverBg, "group-hover:text-white pb-0.5")}>
                           {project.name.charAt(0)}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className={cn("text-base font-bold text-slate-900 transition-colors truncate", `group-hover:${colorTheme.text}`)}>{translateData(project.name)}</p>
+                        <p className={cn("text-base font-bold text-slate-900 dark:text-zinc-100 transition-colors truncate", `group-hover:${colorTheme.text}`)}>{translateData(project.name)}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
                       </div>
                     </div>
@@ -567,22 +567,22 @@ export const Dashboard: React.FC = () => {
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[70%]">
                           {stageDisplay}
                         </span>
-                        <span className="text-sm font-black text-slate-900">{checklistProgress}%</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-zinc-100">{checklistProgress}%</span>
                       </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
+                      <div className="w-full bg-slate-100 dark:bg-white/10 h-2 rounded-full overflow-hidden relative">
                         <div className={cn("h-full transition-all duration-1000", colorTheme.progress)} style={{ width: `${checklistProgress}%` }} />
                       </div>
                     </div>
                   </div>
 
                   {/* Hover Overlay showing completed stages */}
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-5 flex flex-col justify-center items-start">
+                  <div className="absolute inset-0 bg-white/95 dark:bg-[#121212]/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-5 flex flex-col justify-center items-start">
                     <h4 className={cn("text-[10px] font-black uppercase tracking-widest mb-1", colorTheme.text)}>{typeOfConstruction}</h4>
-                    <p className="text-xs font-bold text-slate-800 mb-3 px-2 py-0.5 bg-slate-100 rounded-md">Status: {translateData(STAGE_LABELS[project.status])}</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 mb-3 px-2 py-0.5 bg-slate-100 dark:bg-white/10 rounded-md">Status: {translateData(STAGE_LABELS[project.status])}</p>
                     
                     <div className="space-y-2 w-full mt-2">
                       {recentCompleted.map((line, i) => (
-                        <div key={i} className="text-xs text-slate-600 font-medium flex items-start gap-2">
+                        <div key={i} className="text-xs text-slate-600 dark:text-zinc-400 font-medium flex items-start gap-2">
                           <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                           <span className="line-clamp-2">{translateData(line)}</span>
                         </div>
@@ -590,25 +590,25 @@ export const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className={cn("grid grid-cols-2 gap-3 pt-4 border-t border-slate-50 relative z-10 transition-colors duration-300", dashboardStyle === 'flat' ? "" : "bg-transparent group-hover:bg-transparent")}>
-                    <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
-                      <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Client Payments</p>
+                  <div className={cn("grid grid-cols-2 gap-3 pt-4 border-t border-slate-50 dark:border-white/5 relative z-10 transition-colors duration-300", dashboardStyle === 'flat' ? "" : "bg-transparent group-hover:bg-transparent")}>
+                    <div className="bg-emerald-50/50 dark:bg-emerald-950/30 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/30">
+                      <p className="text-[9px] font-bold text-emerald-600/70 dark:text-emerald-500/80 uppercase tracking-widest mb-1">Client Payments</p>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-emerald-700">
+                        <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
                           {isPrivacyMode ? '••••••' : `₹${totalReceived.toLocaleString()}`}
                         </span>
-                        <span className="text-[10px] font-bold text-emerald-600/50">
+                        <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-500/60">
                           of {isPrivacyMode ? '••••••' : `₹${totalValue.toLocaleString()}`}
                         </span>
                       </div>
                     </div>
-                    <div className="bg-amber-50/50 p-3 rounded-2xl border border-amber-100/50">
-                      <p className="text-[9px] font-bold text-amber-600/70 uppercase tracking-widest mb-1">Vendor Costs</p>
+                    <div className="bg-amber-50/50 dark:bg-amber-950/30 p-3 rounded-2xl border border-amber-100/50 dark:border-amber-900/30">
+                      <p className="text-[9px] font-bold text-amber-600/70 dark:text-amber-500/80 uppercase tracking-widest mb-1">Vendor Costs</p>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-amber-700">
+                        <span className="text-sm font-black text-amber-700 dark:text-amber-400">
                           {isPrivacyMode ? '••••••' : `₹${totalVendorPaid.toLocaleString()}`}
                         </span>
-                        <span className="text-[10px] font-bold text-amber-600/50">
+                        <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-500/60">
                           of {isPrivacyMode ? '••••••' : `₹${totalVendorCost.toLocaleString()}`}
                         </span>
                       </div>

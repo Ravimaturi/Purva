@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 export type AccentColor = 'indigo' | 'rose' | 'emerald' | 'blue' | 'violet' | 'orange' | 'slate';
 export type DashboardStyle = 'shadow' | 'border' | 'glass' | 'flat';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   accentColor: AccentColor;
@@ -11,10 +12,13 @@ interface ThemeContextType {
   setDashboardStyle: (style: DashboardStyle) => void;
   isColorful: boolean;
   setIsColorful: (colorful: boolean) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
   workspaceName: string;
   setWorkspaceName: (name: string) => Promise<void>;
   workspaceLogo: string | null;
-  setWorkspaceLogo: (logo: string | null) => Promise<void>;
+  workspaceLogoFull: string | null;
+  setWorkspaceLogo: (logo: string | null, fullLogo?: string | null) => Promise<void>;
   getProjectColors: (index: number) => any;
   getDashboardColors: () => any;
 }
@@ -35,25 +39,64 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved !== null ? saved === 'true' : true;
   });
 
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    return (localStorage.getItem('app-themeMode') as ThemeMode) || 'light';
+  });
+
   const [workspaceName, setWorkspaceNameState] = useState<string>('Purva Vedic');
   const [workspaceLogo, setWorkspaceLogoState] = useState<string | null>(null);
+  const [workspaceLogoFull, setWorkspaceLogoFullState] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem('app-accent', accentColor);
     localStorage.setItem('app-cardStyle', dashboardStyle);
     localStorage.setItem('app-colorful', String(isColorful));
+    localStorage.setItem('app-themeMode', themeMode);
     
     // Set root attribute to let CSS override the theme colors globally
     document.documentElement.setAttribute('data-accent', accentColor);
-  }, [accentColor, dashboardStyle, isColorful]);
+    
+    // Apply dark mode
+    let isDark = false;
+    if (themeMode === 'system') {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } else {
+      isDark = themeMode === 'dark';
+    }
+    
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [accentColor, dashboardStyle, isColorful, themeMode]);
+
+  // Listen for system theme changes if using 'system'
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [themeMode]);
 
   useEffect(() => {
     const loadWorkspaceSettings = async () => {
       // Load local settings as fallback
       const localName = localStorage.getItem('app-workspace-name');
       const localLogo = localStorage.getItem('app-workspace-logo');
+      const localLogoFull = localStorage.getItem('app-workspace-logo-full');
       if (localName) setWorkspaceNameState(localName);
       if (localLogo) setWorkspaceLogoState(localLogo);
+      if (localLogoFull) setWorkspaceLogoFullState(localLogoFull);
 
       // Try fetching from supabase (it will fail if the table doesn't exist yet, which is expected before running the SQL)
       try {
@@ -61,6 +104,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!error && data) {
           if (data.workspace_name) setWorkspaceNameState(data.workspace_name);
           if (data.logo_url) setWorkspaceLogoState(data.logo_url);
+          if (data.full_logo_url !== undefined) setWorkspaceLogoFullState(data.full_logo_url);
         }
       } catch (err) {
         // Table probably doesn't exist yet, ignore
@@ -84,17 +128,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const setWorkspaceLogo = async (logo: string | null) => {
+  const setWorkspaceLogo = async (logo: string | null, fullLogo?: string | null) => {
     setWorkspaceLogoState(logo);
+    if (fullLogo !== undefined) setWorkspaceLogoFullState(fullLogo);
+
     if (logo) localStorage.setItem('app-workspace-logo', logo);
     else localStorage.removeItem('app-workspace-logo');
 
+    if (fullLogo !== undefined) {
+      if (fullLogo) localStorage.setItem('app-workspace-logo-full', fullLogo);
+      else localStorage.removeItem('app-workspace-logo-full');
+    }
+
     try {
       const { data } = await supabase.from('workspace_settings').select('id').limit(1).maybeSingle();
+      const updateData: any = { logo_url: logo };
+      if (fullLogo !== undefined) updateData.full_logo_url = fullLogo;
+
       if (data?.id) {
-        await supabase.from('workspace_settings').update({ logo_url: logo }).eq('id', data.id);
+        await supabase.from('workspace_settings').update(updateData).eq('id', data.id);
       } else {
-        await supabase.from('workspace_settings').insert([{ logo_url: logo }]);
+        await supabase.from('workspace_settings').insert([updateData]);
       }
     } catch (err) {
       // Ignored
@@ -102,13 +156,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const PALETTES: Record<AccentColor, any> = {
-    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100', progress: 'bg-indigo-500', hoverBg: 'hover:bg-indigo-500', solid: 'bg-indigo-600', solidHover: 'hover:bg-indigo-700' },
-    rose: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', progress: 'bg-rose-500', hoverBg: 'hover:bg-rose-500', solid: 'bg-rose-600', solidHover: 'hover:bg-rose-700' },
-    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', progress: 'bg-emerald-500', hoverBg: 'hover:bg-emerald-500', solid: 'bg-emerald-600', solidHover: 'hover:bg-emerald-700' },
-    blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', progress: 'bg-blue-500', hoverBg: 'hover:bg-blue-500', solid: 'bg-blue-600', solidHover: 'hover:bg-blue-700' },
-    violet: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-100', progress: 'bg-violet-500', hoverBg: 'hover:bg-violet-500', solid: 'bg-violet-600', solidHover: 'hover:bg-violet-700' },
-    orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100', progress: 'bg-orange-500', hoverBg: 'hover:bg-orange-500', solid: 'bg-orange-600', solidHover: 'hover:bg-orange-700' },
-    slate: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', progress: 'bg-slate-600', hoverBg: 'hover:bg-slate-600', solid: 'bg-slate-700', solidHover: 'hover:bg-slate-800' },
+    indigo: { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-100 dark:border-indigo-500/20', progress: 'bg-indigo-500', hoverBg: 'hover:bg-indigo-500', solid: 'bg-indigo-600', solidHover: 'hover:bg-indigo-700' },
+    rose: { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-100 dark:border-rose-500/20', progress: 'bg-rose-500', hoverBg: 'hover:bg-rose-500', solid: 'bg-rose-600', solidHover: 'hover:bg-rose-700' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-100 dark:border-emerald-500/20', progress: 'bg-emerald-500', hoverBg: 'hover:bg-emerald-500', solid: 'bg-emerald-600', solidHover: 'hover:bg-emerald-700' },
+    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20', progress: 'bg-blue-500', hoverBg: 'hover:bg-blue-500', solid: 'bg-blue-600', solidHover: 'hover:bg-blue-700' },
+    violet: { bg: 'bg-violet-50 dark:bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-100 dark:border-violet-500/20', progress: 'bg-violet-500', hoverBg: 'hover:bg-violet-500', solid: 'bg-violet-600', solidHover: 'hover:bg-violet-700' },
+    orange: { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20', progress: 'bg-orange-500', hoverBg: 'hover:bg-orange-500', solid: 'bg-orange-600', solidHover: 'hover:bg-orange-700' },
+    slate: { bg: 'bg-slate-100 dark:bg-slate-800/40', text: 'text-slate-700 dark:text-zinc-300', border: 'border-slate-200 dark:border-white/10', progress: 'bg-slate-600', hoverBg: 'hover:bg-slate-600', solid: 'bg-slate-700', solidHover: 'hover:bg-slate-800' },
   };
 
   const getProjectColors = (index: number) => {
@@ -136,8 +190,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       accentColor, setAccentColor, 
       dashboardStyle, setDashboardStyle, 
       isColorful, setIsColorful, 
+      themeMode, setThemeMode,
       workspaceName, setWorkspaceName,
-      workspaceLogo, setWorkspaceLogo,
+      workspaceLogo, workspaceLogoFull, setWorkspaceLogo,
       getProjectColors, getDashboardColors 
     }}>
       {children}

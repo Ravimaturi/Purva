@@ -99,10 +99,10 @@ export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('kanban')}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100 tracking-tight">{t('kanban')}</h2>
         
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-white/10 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 shadow-sm">
             <Filter className="w-4 h-4 text-slate-400" />
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="w-[200px] border-none shadow-none h-8 p-0 focus:ring-0 text-xs font-bold">
@@ -117,7 +117,7 @@ export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = 
             </Select>
           </div>
 
-          <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
               {t('showing')} {filteredTasks.length} {t('tasks')} {user?.role !== 'admin' ? t('assigned_to_you') : t('across_all_projects')}
             </p>

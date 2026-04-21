@@ -234,7 +234,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
             <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 transition-colors", `group-focus-within:${themeColors.text}`)} />
             <Input 
               placeholder={t('search_projects')} 
-              className={cn("pl-10 bg-white border-slate-200 rounded-2xl h-11 focus:ring-2 transition-all", `focus:ring-[${themeColors.solid}]/20`)}
+              className={cn("pl-10 bg-white dark:bg-[#121212] dark:border-white/10 dark:text-zinc-100 border-slate-200 rounded-2xl h-11 focus:ring-2 transition-all", `focus:ring-[${themeColors.solid}]/20`)}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -243,7 +243,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
         {!employeeView && (
           <Button 
             onClick={() => setIsNewDialogOpen(true)}
-            className={cn("rounded-2xl shadow-lg h-11 px-6 font-bold text-sm transition-all active:scale-95 text-white", themeColors.solid, themeColors.solidHover)}
+            className={cn("rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold text-sm transition-all active:scale-95 text-white", themeColors.solid, themeColors.solidHover)}
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('add_project')}
@@ -255,14 +255,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
       <div className="grid grid-cols-1 gap-4 lg:hidden">
         {loading ? (
           [1, 2, 3].map(i => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 animate-pulse space-y-4">
-              <div className="h-6 bg-slate-100 rounded-lg w-3/4" />
-              <div className="h-4 bg-slate-50 rounded-lg w-1/2" />
-              <div className="h-2 bg-slate-100 rounded-full w-full" />
+            <div key={i} className="bg-white dark:bg-[#121212] p-6 rounded-3xl border border-slate-100 dark:border-white/10 animate-pulse space-y-4">
+              <div className="h-6 bg-slate-100 dark:bg-white/5 rounded-lg w-3/4" />
+              <div className="h-4 bg-slate-50 dark:bg-white/5 rounded-lg w-1/2" />
+              <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full w-full" />
             </div>
           ))
         ) : filteredAndSortedProjects.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
+          <div className="text-center py-16 bg-white dark:bg-[#121212] rounded-3xl border border-dashed border-slate-200 dark:border-white/10">
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t('no_projects_found')}</p>
           </div>
         ) : (
@@ -277,12 +277,12 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   setIsDetailsOpen(true);
                 }
               }}
-              className="border-none shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer overflow-hidden rounded-3xl"
+              className="border-none shadow-sm dark:bg-[#121212] dark:border dark:border-white/10 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer overflow-hidden rounded-3xl"
             >
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 tracking-tight truncate">{translateData(project.name)}</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-zinc-100 tracking-tight truncate">{translateData(project.name)}</h3>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{translateData(project.client_name)}</p>
                   </div>
                   <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter shrink-0">
@@ -297,7 +297,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                         {getInitials(project.assigned_to || t('unassigned'))}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider truncate max-w-[100px]">
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider truncate max-w-[100px]">
                       {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
                     </span>
                   </div>
@@ -307,7 +307,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                       <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                         <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
                       </div>
-                      <span className="text-xs font-black text-slate-900">{project.progress}%</span>
+                      <span className="text-xs font-black text-slate-900 dark:text-slate-100">{project.progress}%</span>
                     </div>
                   </div>
                 </div>
@@ -318,13 +318,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="hidden lg:block bg-white dark:bg-[#121212] rounded-[32px] border border-slate-100 dark:border-white/10 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent border-slate-100">
+            <TableHeader className="bg-slate-50 dark:bg-[#181818]">
+              <TableRow className="hover:bg-transparent border-slate-100 dark:border-white/10">
                 <TableHead 
-                  className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap cursor-pointer hover:text-indigo-600 transition-colors"
+                  className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                   onClick={() => handleSort('name')}
                 >
                   <div className="flex items-center">
@@ -332,28 +332,28 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap hidden md:table-cell cursor-pointer hover:text-indigo-600 transition-colors"
+                  className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap hidden md:table-cell cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                   onClick={() => handleSort('client_name')}
                 >
                   <div className="flex items-center">
                     {t('client_name')} <SortIcon field="client_name" />
                   </div>
                 </TableHead>
-                <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap">
+                <TableHead className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {t('status')}
                     <DropdownMenu>
                       <DropdownMenuTrigger 
                         render={
-                          <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
-                            <Filter className={cn("w-3 h-3", statusFilter !== 'All' ? "text-indigo-600" : "text-slate-400")} />
+                          <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200 dark:hover:bg-[#121212]">
+                            <Filter className={cn("w-3 h-3", statusFilter !== 'All' ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-500")} />
                           </Button>
                         }
                       />
-                      <DropdownMenuContent align="start" className="rounded-xl">
+                      <DropdownMenuContent align="start" className="rounded-xl dark:bg-[#121212] dark:border-white/10">
                         {uniqueStatuses.map(status => (
-                          <DropdownMenuItem key={status} onClick={() => setStatusFilter(status)}>
-                            <span className={cn(statusFilter === status && "font-bold text-indigo-600")}>
+                          <DropdownMenuItem key={status} onClick={() => setStatusFilter(status)} className="dark:text-zinc-300 dark:hover:bg-[#181818] dark:hover:text-zinc-100">
+                            <span className={cn(statusFilter === status && "font-bold text-indigo-600 dark:text-indigo-400")}>
                               {status === 'All' ? t('all_projects') : translateData(STAGE_LABELS[status as any] || status)}
                             </span>
                           </DropdownMenuItem>
@@ -362,21 +362,21 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                     </DropdownMenu>
                   </div>
                 </TableHead>
-                <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap hidden sm:table-cell">
+                <TableHead className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap hidden sm:table-cell">
                   <div className="flex items-center gap-2">
                     {t('assigned_to')}
                     <DropdownMenu>
                       <DropdownMenuTrigger 
                         render={
-                          <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200">
-                            <Filter className={cn("w-3 h-3", assignedFilter !== 'All' ? "text-indigo-600" : "text-slate-400")} />
+                          <Button variant="ghost" size="icon" className="h-5 w-5 rounded-md hover:bg-slate-200 dark:hover:bg-[#121212]">
+                            <Filter className={cn("w-3 h-3", assignedFilter !== 'All' ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-500")} />
                           </Button>
                         }
                       />
-                      <DropdownMenuContent align="start" className="rounded-xl">
+                      <DropdownMenuContent align="start" className="rounded-xl dark:bg-[#121212] dark:border-white/10">
                         {uniqueAssignees.map(assignee => (
-                          <DropdownMenuItem key={assignee} onClick={() => setAssignedFilter(assignee)}>
-                            <span className={cn(assignedFilter === assignee && "font-bold text-indigo-600")}>{assignee}</span>
+                          <DropdownMenuItem key={assignee} onClick={() => setAssignedFilter(assignee)} className="dark:text-zinc-300 dark:hover:bg-[#181818] dark:hover:text-zinc-100">
+                            <span className={cn(assignedFilter === assignee && "font-bold text-indigo-600 dark:text-indigo-400")}>{assignee}</span>
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -384,7 +384,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap hidden lg:table-cell cursor-pointer hover:text-indigo-600 transition-colors"
+                  className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap hidden lg:table-cell cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                   onClick={() => handleSort('deadline')}
                 >
                   <div className="flex items-center">
@@ -392,7 +392,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="font-bold text-slate-400 uppercase tracking-widest text-[10px] whitespace-nowrap cursor-pointer hover:text-indigo-600 transition-colors"
+                  className="font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                   onClick={() => handleSort('progress')}
                 >
                   <div className="flex items-center">
@@ -425,7 +425,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                 filteredAndSortedProjects.map((project) => (
                   <TableRow 
                     key={project.id} 
-                    className="hover:bg-indigo-50/30 border-slate-50 group cursor-pointer transition-colors"
+                    className="hover:bg-indigo-50/30 dark:hover:bg-[#181818] border-slate-50 dark:border-white/5 group cursor-pointer transition-colors"
                     onClick={() => {
                       if (onProjectClick) {
                         onProjectClick(project);
@@ -438,57 +438,57 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                     <TableCell className="py-5 px-6">
                       <div className="flex items-center gap-3">
                         {project.logo_url ? (
-                          <img src={project.logo_url} alt="Logo" className="w-9 h-9 rounded-xl object-contain shadow-sm border border-slate-200 bg-white group-hover:border-indigo-200 transition-all" />
+                          <img src={project.logo_url} alt="Logo" className="w-9 h-9 rounded-xl object-contain shadow-sm border border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] group-hover:border-indigo-200 dark:group-hover:border-indigo-500/50 transition-all" />
                         ) : (
-                          <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-[#121212] dark:border dark:border-white/10 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-600 dark:group-hover:bg-indigo-600 group-hover:text-white transition-all">
                             {project.name.charAt(0)}
                           </div>
                         )}
-                        <span className="font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">{translateData(project.name)}</span>
+                        <span className="font-bold text-slate-900 dark:text-zinc-100 tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{translateData(project.name)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap hidden md:table-cell">{translateData(project.client_name)}</TableCell>
+                    <TableCell className="text-xs text-slate-500 dark:text-zinc-500 font-bold uppercase tracking-widest whitespace-nowrap hidden md:table-cell">{translateData(project.client_name)}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-tighter whitespace-nowrap">
+                      <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-tighter whitespace-nowrap">
                         {translateData(STAGE_LABELS[project.status])}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="flex items-center gap-2 whitespace-nowrap">
-                        <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
+                        <Avatar className="h-7 w-7 border-2 border-white dark:border-white/10 shadow-sm">
                           <AvatarFallback className="bg-indigo-600 text-white font-bold text-[9px]">
                             {getInitials(project.assigned_to || t('unassigned'))}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-slate-600 dark:text-zinc-400 uppercase tracking-wider">
                           {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap hidden lg:table-cell">
+                    <TableCell className="text-xs text-slate-500 dark:text-zinc-500 font-bold uppercase tracking-widest whitespace-nowrap hidden lg:table-cell">
                       {STAGE_LABELS[project.status] === 'Handover' 
                         ? formatDate(project.completed_at || project.deadline) 
                         : formatDate(project.deadline)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-4 whitespace-nowrap">
-                        <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-24 bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
                           <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${project.progress}%` }} />
                         </div>
-                        <span className="text-xs font-black text-slate-900 tracking-tighter">{project.progress}%</span>
+                        <span className="text-xs font-black text-slate-900 dark:text-zinc-100 tracking-tighter">{project.progress}%</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <DropdownMenu>
                         <DropdownMenuTrigger 
-                          className="rounded-xl h-9 w-9 text-slate-400 hover:bg-white hover:shadow-sm flex items-center justify-center transition-all outline-none border border-transparent hover:border-slate-100"
+                          className="rounded-xl h-9 w-9 text-slate-400 dark:text-zinc-500 hover:bg-white dark:hover:bg-[#181818] hover:shadow-sm flex items-center justify-center transition-all outline-none border border-transparent hover:border-slate-100 dark:hover:border-white/10"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-2xl border-slate-200 shadow-xl p-1.5 min-w-[160px]">
+                        <DropdownMenuContent align="end" className="rounded-2xl border-slate-200 dark:border-white/10 dark:bg-[#121212] shadow-xl p-1.5 min-w-[160px]">
                           <DropdownMenuItem 
-                            className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest"
+                            className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest dark:text-zinc-300 dark:hover:bg-[#181818] dark:hover:text-zinc-100"
                             onClick={() => {
                               if (onProjectClick) {
                                 onProjectClick(project);

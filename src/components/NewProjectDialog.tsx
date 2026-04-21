@@ -149,28 +149,28 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] rounded-3xl border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] rounded-3xl border-none shadow-2xl dark:bg-[#121212] dark:border dark:border-white/10">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold tracking-tight">Create New Project</DialogTitle>
+          <DialogTitle className="text-2xl font-bold tracking-tight dark:text-zinc-100">Create New Project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="flex items-center gap-4">
             {formData.logo_url ? (
-              <img src={formData.logo_url} alt="Logo" className="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100" />
+              <img src={formData.logo_url} alt="Logo" className="w-16 h-16 rounded-xl object-contain bg-slate-50 dark:bg-[#0a0a0a] dark:border-white/10 border border-slate-100 shadow-sm" />
             ) : (
-              <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                <ImageIcon className="w-6 h-6 text-slate-400" />
+              <div className="w-16 h-16 rounded-xl bg-slate-50 dark:bg-[#181818] border border-slate-100 dark:border-white/10 flex items-center justify-center cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                <ImageIcon className="w-6 h-6 text-slate-400 dark:text-zinc-500" />
               </div>
             )}
             <div className="flex-1">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Project Logo (Optional)</Label>
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Project Logo (Optional)</Label>
               <div className="flex items-center gap-2 mt-1">
-                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="dark:border-white/10 dark:bg-transparent dark:text-zinc-300 dark:hover:bg-white/5">
                   <Upload className="w-4 h-4 mr-2" />
                   Upload
                 </Button>
                 {formData.logo_url && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, logo_url: '' })} className="text-red-500 hover:text-red-600">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, logo_url: '' })} className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-500/10">
                     Remove
                   </Button>
                 )}
@@ -186,61 +186,61 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-slate-400">Project Name</Label>
+            <Label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Project Name</Label>
             <Input 
               id="name" 
               required 
               placeholder="e.g. Mahadev Temple Construction"
-              className="rounded-xl border-slate-200"
+              className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="client" className="text-xs font-bold uppercase tracking-widest text-slate-400">Client Name</Label>
+            <Label htmlFor="client" className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Client Name</Label>
             <Input 
               id="client" 
               required 
               placeholder="e.g. Dharma Trust"
-              className="rounded-xl border-slate-200"
+              className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100"
               value={formData.client_name}
               onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Assigned To</Label>
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Assigned To</Label>
               <Select 
                 value={formData.assigned_to} 
                 onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
               >
-                <SelectTrigger className="rounded-xl border-slate-200">
+                <SelectTrigger className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl dark:bg-[#181818] dark:border-white/10">
                   {allUsers.map(u => (
-                    <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
+                    <SelectItem key={u.id} value={u.full_name} className="dark:text-zinc-300 dark:hover:bg-white/5">{u.full_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="deadline" className="text-xs font-bold uppercase tracking-widest text-slate-400">Deadline</Label>
+            <Label htmlFor="deadline" className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Deadline</Label>
             <Input 
               id="deadline" 
               type="date" 
-              className="rounded-xl border-slate-200"
+              className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100"
               value={formData.deadline}
               onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-slate-400">Description</Label>
+            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">Description</Label>
             <Textarea 
               id="description" 
               placeholder="Project details and requirements..."
-              className="rounded-xl border-slate-200 min-h-[100px]"
+              className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100 min-h-[100px]"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
@@ -250,14 +250,14 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
               type="button" 
               variant="ghost" 
               onClick={() => onOpenChange(false)}
-              className="rounded-xl"
+              className="rounded-xl dark:text-zinc-300 dark:hover:bg-white/5"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={loading}
-              className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-8 shadow-lg shadow-indigo-100"
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-8 shadow-lg shadow-indigo-100 dark:shadow-none"
             >
               {loading ? 'Creating...' : 'Create Project'}
             </Button>

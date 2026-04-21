@@ -1,10 +1,11 @@
 import React, { useRef } from 'react';
-import { useTheme, AccentColor, DashboardStyle } from '../contexts/ThemeContext';
+import { useTheme, AccentColor, DashboardStyle, ThemeMode } from '../contexts/ThemeContext';
+import { useUser } from '../contexts/UserContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { cn, fileToBase64 } from '../lib/utils';
-import { Paintbrush, LayoutDashboard, Palette, Image as ImageIcon, Upload, Building2 } from 'lucide-react';
+import { Paintbrush, LayoutDashboard, Palette, Image as ImageIcon, Upload, Building2, Sun, Moon, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImageCropperDialog } from './ImageCropperDialog';
 
@@ -14,7 +15,8 @@ interface AppearanceSettingsProps {
 }
 
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, onOpenChange }) => {
-  const { accentColor, setAccentColor, dashboardStyle, setDashboardStyle, isColorful, setIsColorful, workspaceLogo, setWorkspaceLogo, workspaceName, setWorkspaceName } = useTheme();
+  const { accentColor, setAccentColor, dashboardStyle, setDashboardStyle, isColorful, setIsColorful, themeMode, setThemeMode, workspaceLogo, setWorkspaceLogo, workspaceName, setWorkspaceName } = useTheme();
+  const { user } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localName, setLocalName] = React.useState(workspaceName);
   
@@ -44,7 +46,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
   };
 
   const handleCropComplete = async (croppedBase64: string) => {
-    await setWorkspaceLogo(croppedBase64);
+    // Save both the cropped icon and the full original image
+    await setWorkspaceLogo(croppedBase64, cropImageSrc);
     toast.success('Workspace logo updated!');
     setCropImageSrc('');
   };
@@ -69,11 +72,11 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] rounded-3xl border-none shadow-2xl">
+      <DialogContent className="w-[95vw] sm:max-w-[480px] p-4 sm:p-6 rounded-[24px] border-none shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-[#121212] bg-white">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-              <Paintbrush className="w-5 h-5 text-slate-700" />
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Paintbrush className="w-5 h-5 text-slate-700 dark:text-zinc-300" />
             </div>
             <div>
               <DialogTitle className="text-xl font-bold tracking-tight">Appearance</DialogTitle>
@@ -108,13 +111,39 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
               ))}
             </div>
 
-            <div className="mt-4 flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 justify-between cursor-pointer active:scale-[0.98] transition-all" onClick={() => setIsColorful(!isColorful)}>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 mt-6">
+              <Moon className="w-4 h-4" />
+              Theme Mode
+            </h3>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {[
+                { id: 'light', name: 'Light', icon: Sun },
+                { id: 'dark', name: 'Nightview', icon: Moon },
+                { id: 'system', name: 'System', icon: Monitor },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setThemeMode(mode.id as ThemeMode)}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
+                    themeMode === mode.id 
+                      ? "border-slate-800 bg-slate-50 dark:bg-[#202020] dark:border-white/10 shadow-sm text-slate-900 dark:text-zinc-100" 
+                      : "border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a]"
+                  )}
+                >
+                  <mode.icon className="w-5 h-5 mb-2" />
+                  <span className="text-xs font-bold">{mode.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center p-4 bg-slate-50 dark:bg-[#181818] rounded-2xl border border-slate-100 dark:border-white/10 justify-between cursor-pointer active:scale-[0.98] transition-all" onClick={() => setIsColorful(!isColorful)}>
               <div>
-                <p className="font-bold text-sm text-slate-900">Rainbow Project Colors</p>
+                <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">Rainbow Project Colors</p>
                 <p className="text-xs text-slate-500">Each project card gets a unique color</p>
               </div>
-              <div className={cn("w-10 h-6 rounded-full flex items-center transition-colors px-1", isColorful ? "bg-indigo-600 justify-end" : "bg-slate-300 justify-start")}>
-                <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
+              <div className={cn("w-10 h-6 rounded-full flex items-center transition-colors px-1", isColorful ? "bg-indigo-600 justify-end" : "bg-slate-300 dark:bg-slate-700 justify-start")}>
+                <div className="w-4 h-4 rounded-full bg-white dark:bg-white shadow-sm" />
               </div>
             </div>
           </div>
@@ -132,80 +161,82 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
                   className={cn(
                     "p-4 rounded-2xl border cursor-pointer transition-all",
                     dashboardStyle === style.id 
-                      ? "border-slate-800 bg-slate-50 shadow-sm" 
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+                      ? "border-slate-800 bg-slate-50 dark:bg-slate-950 shadow-sm" 
+                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:bg-slate-950/50"
                   )}
                 >
-                  <p className={cn("font-bold text-sm mb-1", dashboardStyle === style.id ? "text-slate-900" : "text-slate-700")}>{style.name}</p>
+                  <p className={cn("font-bold text-sm mb-1", dashboardStyle === style.id ? "text-slate-900 dark:text-slate-100" : "text-slate-700")}>{style.name}</p>
                   <p className="text-[10px] text-slate-500 font-medium leading-relaxed">{style.desc}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
-              Workspace Details
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-700 mb-1 block">Workspace Name</label>
-                <div className="flex gap-2">
-                  <Input 
-                    value={localName}
-                    onChange={(e) => setLocalName(e.target.value)}
-                    className="border-slate-200"
-                  />
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setWorkspaceName(localName);
-                      toast.success('Workspace name updated');
-                    }}
-                    disabled={localName === workspaceName}
-                  >
-                    Save
-                  </Button>
+          {user?.role === 'admin' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Workspace Details
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 mb-1 block">Workspace Name</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      value={localName}
+                      onChange={(e) => setLocalName(e.target.value)}
+                      className="border-slate-200 dark:border-slate-800"
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setWorkspaceName(localName);
+                        toast.success('Workspace name updated');
+                      }}
+                      disabled={localName === workspaceName}
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-4 p-4 mt-2 border border-slate-200 rounded-2xl bg-white">
-              {workspaceLogo ? (
-                <img src={workspaceLogo} alt="Workspace Logo" className="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100" />
-              ) : (
-                <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center">
-                  <ImageIcon className="w-5 h-5 text-slate-400" />
-                </div>
-              )}
-              <div className="flex-1">
-                <p className="text-sm font-bold text-slate-900">Upload Logo</p>
-                <p className="text-xs text-slate-500">Max 2MB. Recommended: PNG</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {workspaceLogo && (
-                  <Button variant="ghost" size="sm" onClick={() => setWorkspaceLogo(null)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                    Remove
-                  </Button>
+              
+              <div className="flex items-center gap-4 p-4 mt-2 border border-slate-200 dark:border-white/10 rounded-2xl bg-white dark:bg-[#121212]">
+                {workspaceLogo ? (
+                  <img src={workspaceLogo} alt="Workspace Logo" className="w-12 h-12 rounded-lg object-contain bg-slate-50 dark:bg-[#181818] border border-slate-100 dark:border-white/10" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-slate-50 dark:bg-[#181818] border border-slate-100 dark:border-white/10 flex items-center justify-center">
+                    <ImageIcon className="w-5 h-5 text-slate-400" />
+                  </div>
                 )}
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Browse
-                </Button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept="image/png, image/jpeg, image/svg+xml"
-                  onChange={handleLogoUpload}
-                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Upload Logo</p>
+                  <p className="text-xs text-slate-500">Max 2MB. Recommended: PNG</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {workspaceLogo && (
+                    <Button variant="ghost" size="sm" onClick={() => setWorkspaceLogo(null)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                      Remove
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Browse
+                  </Button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    onChange={handleLogoUpload}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex justify-end">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
           <Button onClick={() => onOpenChange(false)} className="rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800">
             Done
           </Button>
