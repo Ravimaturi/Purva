@@ -9,7 +9,30 @@ export type ProjectStatus =
   | 'Construction'     // Kept for legacy compatibility
   | 'Completed';       // Kept for legacy compatibility
 
-export type UserRole = 'admin' | 'employee';
+export type UserRole = 
+  | 'admin'
+  | 'chief_sthapathy'
+  | 'deputy_sthapathy'
+  | 'assistant_sthapathy'
+  | 'junior_sthapathy'
+  | 'finance_manager'
+  | 'employee';
+
+export const RoleLabels: Record<UserRole, string> = {
+  admin: 'Admin',
+  chief_sthapathy: 'Chief Sthapathy',
+  deputy_sthapathy: 'Deputy Sthapathy',
+  assistant_sthapathy: 'Assistant Sthapathy',
+  junior_sthapathy: 'Junior Sthapathy',
+  finance_manager: 'Finance Manager',
+  employee: 'Employee'
+};
+
+export const hasAdminAccess = (role?: UserRole) => role === 'admin' || role === 'chief_sthapathy';
+export const hasProjectManagementAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'deputy_sthapathy';
+export const hasFinanceAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'finance_manager';
+export const isLimitedUser = (role?: UserRole) => role === 'assistant_sthapathy' || role === 'junior_sthapathy' || role === 'employee';
+export const canDownloadDrawings = (role?: UserRole) => role !== 'junior_sthapathy' && role !== 'finance_manager';
 
 export interface Profile {
   id: string;

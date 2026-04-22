@@ -28,7 +28,7 @@ import {
   CheckIcon as CheckSmallIcon,
   Upload
 } from 'lucide-react';
-import { Project, Comment, AuditLog, PaymentStage, Task } from '../types';
+import { Project, Comment, AuditLog, PaymentStage, Task, hasProjectManagementAccess, hasAdminAccess, hasFinanceAccess, isLimitedUser } from '../types';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -771,7 +771,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   <Button size="sm" className="h-7 bg-indigo-600 rounded-lg text-[9px] font-bold px-2 sm:px-3" onClick={handleUpdateProject}>{t('save')}</Button>
                 </div>
               ) : (
-                user?.role === 'admin' && (
+                hasProjectManagementAccess(user?.role) && (
                   <>
                     <Button 
                       variant="ghost" 
@@ -821,12 +821,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 <TabsTrigger value="execution-plan" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                   Execution Plan
                 </TabsTrigger>
-                {user?.role === 'admin' && (
+                {hasFinanceAccess(user?.role) && (
                   <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                     {t('payments')}
                   </TabsTrigger>
                 )}
-                {user?.role === 'admin' && (
+                {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
                   <TabsTrigger value="vendors" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
                     Vendor Orders
                   </TabsTrigger>
@@ -985,7 +985,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             <SelectItem value="Unassigned">Unassigned</SelectItem>
-                            {user?.role === 'admin' || project.assigned_to === user?.full_name ? (
+                            {hasProjectManagementAccess(user?.role) || project.assigned_to === user?.full_name ? (
                               allUsers.map(u => (
                                 <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
                               ))
@@ -1105,7 +1105,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 )}
                               </div>
                             </div>
-                            {user?.role === 'admin' && (
+                            {hasProjectManagementAccess(user?.role) && (
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1222,7 +1222,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     </div>
                   </TabsContent>
 
-                  {user?.role === 'admin' && (
+                  {hasFinanceAccess(user?.role) && (
                     <TabsContent value="payments" className="mt-0 space-y-8 p-4 sm:p-8 flex-1">
                       <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
                         <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider flex items-center gap-2">
@@ -1367,7 +1367,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   </TabsContent>
                 )}
 
-                  {user?.role === 'admin' && (
+                  {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
                     <TabsContent value="vendors" className="mt-0 p-4 sm:p-8 flex-1">
                       <ProjectVendorOrders project={project} />
                     </TabsContent>

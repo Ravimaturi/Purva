@@ -185,6 +185,56 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return PALETTES[accentColor];
   };
 
+  useEffect(() => {
+    // Dynamically update favicon and app icons when workspace logo changes
+    if (workspaceLogo || workspaceLogoFull) {
+      const logoUrl = workspaceLogoFull || workspaceLogo || '';
+      
+      // Update favicons
+      const updateIcon = (selector: string) => {
+        let el = document.querySelector(selector) as HTMLLinkElement;
+        if (!el) {
+          el = document.createElement('link');
+          el.rel = selector.includes('apple-touch-icon') ? 'apple-touch-icon' : 'icon';
+          document.head.appendChild(el);
+        }
+        el.href = logoUrl;
+      };
+      
+      updateIcon('link[rel="icon"]');
+      updateIcon('link[rel="apple-touch-icon"]');
+
+      // Update PWA manifest dynamically
+      try {
+        const manifestStr = JSON.stringify({
+          name: workspaceName || 'Purva Vedic Project Management',
+          short_name: workspaceName || 'Purva Vedic',
+          display: 'standalone',
+          background_color: '#ffffff',
+          theme_color: '#4f46e5',
+          icons: [
+            {
+              src: logoUrl,
+              sizes: '192x192 512x512',
+              type: 'image/png' // Assuming PNG but works loosely
+            }
+          ]
+        });
+        const blob = new Blob([manifestStr], { type: 'application/manifest+json' });
+        const manifestUrl = URL.createObjectURL(blob);
+        let manifestEl = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+        if (!manifestEl) {
+          manifestEl = document.createElement('link');
+          manifestEl.rel = 'manifest';
+          document.head.appendChild(manifestEl);
+        }
+        manifestEl.href = manifestUrl;
+      } catch (e) {
+        console.error('Failed to update manifest dynamically', e);
+      }
+    }
+  }, [workspaceLogo, workspaceLogoFull, workspaceName]);
+
   return (
     <ThemeContext.Provider value={{ 
       accentColor, setAccentColor, 

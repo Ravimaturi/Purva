@@ -43,7 +43,7 @@ import {
   Filter
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Profile, UserRole } from '../types';
+import { Profile, UserRole, RoleLabels, hasAdminAccess } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -165,7 +165,7 @@ export const TeamManagement: React.FC = () => {
     });
 
   const uniqueDesignations = ['All', ...new Set(users.map(u => u.designation || 'N/A'))];
-  const uniqueRoles = ['All', 'admin', 'employee'];
+  const uniqueRoles = ['All', ...(Object.keys(RoleLabels) as UserRole[])];
 
   const handleSort = (field: keyof Profile) => {
     if (sortField === field) {
@@ -176,7 +176,7 @@ export const TeamManagement: React.FC = () => {
     }
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (!hasAdminAccess(currentUser?.role)) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
         <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600">
@@ -280,8 +280,8 @@ export const TeamManagement: React.FC = () => {
                     } />
                     <DropdownMenuContent align="start" className="rounded-xl">
                       {uniqueRoles.map(r => (
-                        <DropdownMenuItem key={r} onClick={() => setRoleFilter(r)}>
-                          {r.toUpperCase()}
+                        <DropdownMenuItem key={r} onClick={() => setRoleFilter(r as UserRole | 'All')}>
+                          {r === 'All' ? 'All' : RoleLabels[r as UserRole] || r}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -329,15 +329,15 @@ export const TeamManagement: React.FC = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {u.role === 'admin' ? (
+                    {hasAdminAccess(u.role) ? (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100">
                         <Shield className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">ADMIN</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{RoleLabels[u.role] || u.role}</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-slate-950 text-slate-600 rounded-full border border-slate-100 dark:border-slate-800">
                         <UserIcon className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">EMPLOYEE</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{RoleLabels[u.role] || u.role}</span>
                       </div>
                     )}
                   </div>
@@ -451,8 +451,9 @@ export const TeamManagement: React.FC = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="employee">Employee</SelectItem>
+                  {Object.entries(RoleLabels).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

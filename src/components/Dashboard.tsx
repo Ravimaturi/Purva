@@ -18,7 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Project, PaymentStage, VendorOrder } from '../types';
+import { Project, PaymentStage, VendorOrder, hasProjectManagementAccess, hasAdminAccess, hasFinanceAccess, isLimitedUser } from '../types';
 import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -357,27 +357,16 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {user?.role === 'admin' && (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={seedData}
-                disabled={loading}
-                className="rounded-xl border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 h-10 px-4 font-bold text-xs"
-              >
-                Seed Dummy Data
-              </Button>
-              <Button 
-                variant="default" 
-                size="sm"
-                onClick={() => setIsNewDialogOpen(true)}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200/50 dark:shadow-none h-10 px-6 font-bold text-xs"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('add_project')}
-              </Button>
-            </>
+          {hasProjectManagementAccess(user?.role) && (
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={() => setIsNewDialogOpen(true)}
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200/50 dark:shadow-none h-10 px-6 font-bold text-xs"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('add_project')}
+            </Button>
           )}
         </div>
       </div>

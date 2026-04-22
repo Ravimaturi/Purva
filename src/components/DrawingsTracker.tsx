@@ -3,10 +3,13 @@ import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest } from '../lib/msalConfig';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Button } from './ui/button';
-import { FileIcon, Download, Upload, Loader2, FolderOpen, Image as ImageIcon, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { FileIcon, Download, Upload, Loader2, FolderOpen, Image as ImageIcon, FileText, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { canDownloadDrawings } from '../types';
+import { uploadToAutodeskCloud } from '../lib/autodesk';
 
 interface DrawingsTrackerProps {
   projectId: string;
@@ -25,6 +28,14 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   const isAuthenticated = useIsAuthenticated();
   const { user, allUsers } = useUser();
   const [isUploading, setIsUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{name: string, url: string} | null>(null);
+
+  const getPreviewUrl = (url: string) => {
+    if (url.includes('sharepoint.com') || url.includes('onedrive.live.com')) {
+      return url + (url.includes('?') ? '&' : '?') + 'action=embedview';
+    }
+    return url;
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown date';
@@ -133,6 +144,11 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
         }
       }
       
+      const fileNameLower = file.name.toLowerCase();
+      if (fileNameLower.endsWith('.dwg') || fileNameLower.endsWith('.stl') || fileNameLower.endsWith('.rvt')) {
+        await uploadToAutodeskCloud(file, folderPath, projectId);
+      }
+
       // Create an organization-wide sharing link so anyone in the company can view it
       let sharedUrl = '';
       try {
@@ -291,26 +307,34 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                           variant="outline" 
                           size="sm" 
                           className="h-8 text-xs font-bold"
-                          onClick={() => window.open(file.url, '_blank')}
+                          onClick={() => setPreviewFile({ name: file.name, url: getPreviewUrl(file.url) })}
                         >
+                          <Eye className="w-3 h-3 mr-1" />
                           View
                         </Button>
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
-                          onClick={() => {
-                            // Try to construct a direct download link if it's a SharePoint/OneDrive URL
-                            let downloadUrl = file.url;
-                            if (downloadUrl.includes('sharepoint.com') || downloadUrl.includes('onedrive.live.com')) {
-                              downloadUrl = downloadUrl + (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
-                            }
-                            window.open(downloadUrl, '_blank');
-                          }}
-                        >
-                          <Download className="w-3 h-3 mr-1" />
-                          Download
-                        </Button>
+                        {canDownloadDrawings(user?.role) && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
+                            onClick={() => {
+                              const ext = file.name.split('.').pop()?.toLowerCase();
+                              if (!canDownloadDrawings(user?.role) && (ext === 'dwg' || ext === 'stl')) {
+                                toast.error('You do not have permission to download drawing files.');
+                                return;
+                              }
+                              // Try to construct a direct download link if it's a SharePoint/OneDrive URL
+                              let downloadUrl = file.url;
+                              if (downloadUrl.includes('sharepoint.com') || downloadUrl.includes('onedrive.live.com')) {
+                                downloadUrl = downloadUrl + (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
+                              }
+                              window.open(downloadUrl, '_blank');
+                            }}
+                          >
+                            <Download className="w-3 h-3 mr-1" />
+                            Download
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -320,6 +344,55 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
           </div>
         </div>
       )}
+
+      {/* File Preview Dialog */}
+      <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+        <DialogContent className="max-w-4xl w-full h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-slate-950 border-slate-800">
+          <DialogHeader className="p-4 border-b border-white/10 shrink-0">
+            <DialogTitle className="text-white text-lg font-bold flex items-center">
+              <Eye className="w-5 h-5 mr-2 text-indigo-400" />
+              {previewFile?.name || 'File Preview'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 w-full flex flex-col bg-[#0a0a0a] relative items-center justify-center">
+            {previewFile && (
+              <>
+                <div className="absolute top-4 right-6 z-10">
+                  <Button 
+                    variant="outline" 
+                    className="bg-black/50 hover:bg-black/80 text-white border-white/20 backdrop-blur-md"
+                    onClick={() => {
+                      let url = previewFile.url;
+                      if (url.includes('action=embedview')) {
+                         url = url.replace(/&action=embedview|\?action=embedview/, '');
+                      }
+                      window.open(url, '_blank');
+                    }}
+                  >
+                    Open in New Tab
+                  </Button>
+                </div>
+
+                {/* If it's a direct browser-readable image or PDF and NOT a OneDrive wrapper URL, render directly, else fallback to iframe. */}
+                {previewFile.name.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) && !previewFile.url.includes('sharepoint.com') && !previewFile.url.includes('onedrive.live.com') ? (
+                  <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain p-4" />
+                ) : previewFile.name.match(/\.(pdf)$/i) && !previewFile.url.includes('sharepoint.com') && !previewFile.url.includes('onedrive.live.com') ? (
+                  <object data={previewFile.url} type="application/pdf" className="absolute inset-0 w-full h-full border-0 bg-white">
+                    <iframe src={previewFile.url} className="absolute inset-0 w-full h-full border-0 bg-white" />
+                  </object>
+                ) : (
+                  <iframe 
+                    src={previewFile.url} 
+                    className="absolute inset-0 w-full h-full border-0 bg-white"
+                    allowFullScreen
+                    title="File Preview"
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

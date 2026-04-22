@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { Vendor, VendorOrder, Project } from '../types';
+import { Vendor, VendorOrder, Project, hasFinanceAccess, hasProjectManagementAccess } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useUser } from '../contexts/UserContext';
 import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink, Edit, Trash2 } from 'lucide-react';
@@ -169,13 +169,15 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button 
-            onClick={() => setIsAddVendorOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Vendor
-          </Button>
+          {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
+            <Button 
+              onClick={() => setIsAddVendorOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Vendor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -197,7 +199,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                     <p className="text-xs font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">{vendor.services_list}</p>
                   </div>
                 </div>
-                {user?.role === 'admin' && (
+                {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"

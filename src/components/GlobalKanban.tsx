@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task, Project } from '../types';
+import { Task, Project, hasAdminAccess, hasProjectManagementAccess, isLimitedUser } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -33,7 +33,7 @@ export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = 
     try {
       // Fetch Projects
       let projectsQuery = supabase.from('projects').select('*');
-      if (user?.role !== 'admin') {
+      if (isLimitedUser(user?.role)) {
         projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
       }
       const { data: projectsData, error: projectsError } = await projectsQuery;
@@ -42,7 +42,7 @@ export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = 
 
       // Fetch Tasks
       let query = supabase.from('tasks').select('*, projects(name)');
-      if (user?.role !== 'admin') {
+      if (isLimitedUser(user?.role)) {
         query = query.eq('assigned_to', user?.full_name);
       }
 

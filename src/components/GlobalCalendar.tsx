@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task, Project } from '../types';
+import { Task, Project, isLimitedUser } from '../types';
 import { CalendarView } from './CalendarView';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -33,7 +33,7 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
     try {
       // Fetch Projects (for deadlines and mapping)
       let projectsQuery = supabase.from('projects').select('*');
-      if (user?.role !== 'admin') {
+      if (isLimitedUser(user?.role)) {
         projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
       }
       const { data: projectsData, error: projectsError } = await projectsQuery;
@@ -42,7 +42,7 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
 
       // Fetch Tasks
       let tasksQuery = supabase.from('tasks').select('*, projects(name)');
-      if (user?.role !== 'admin') {
+      if (isLimitedUser(user?.role)) {
         tasksQuery = tasksQuery.eq('assigned_to', user?.full_name);
       }
       const { data: tasksData, error: tasksError } = await tasksQuery;

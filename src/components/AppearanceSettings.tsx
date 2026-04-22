@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useTheme, AccentColor, DashboardStyle, ThemeMode } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
+import { hasAdminAccess } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -137,17 +138,24 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
               ))}
             </div>
 
-            <div className="mt-4 flex items-center p-4 bg-slate-50 dark:bg-[#181818] rounded-2xl border border-slate-100 dark:border-white/10 justify-between cursor-pointer active:scale-[0.98] transition-all" onClick={() => setIsColorful(!isColorful)}>
-              <div>
-                <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">Rainbow Project Colors</p>
-                <p className="text-xs text-slate-500">Each project card gets a unique color</p>
+          {/* Display options based on access */}
+          {(hasAdminAccess(user?.role) || user?.role === 'finance_manager') && (
+            <>
+              <div className="mt-4 flex items-center p-4 bg-slate-50 dark:bg-[#181818] rounded-2xl border border-slate-100 dark:border-white/10 justify-between cursor-pointer active:scale-[0.98] transition-all" onClick={() => setIsColorful(!isColorful)}>
+                <div>
+                  <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">Rainbow Project Colors</p>
+                  <p className="text-xs text-slate-500">Each project card gets a unique color</p>
+                </div>
+                <div className={cn("w-10 h-6 rounded-full flex items-center transition-colors px-1", isColorful ? "bg-indigo-600 justify-end" : "bg-slate-300 dark:bg-slate-700 justify-start")}>
+                  <div className="w-4 h-4 rounded-full bg-white dark:bg-white shadow-sm" />
+                </div>
               </div>
-              <div className={cn("w-10 h-6 rounded-full flex items-center transition-colors px-1", isColorful ? "bg-indigo-600 justify-end" : "bg-slate-300 dark:bg-slate-700 justify-start")}>
-                <div className="w-4 h-4 rounded-full bg-white dark:bg-white shadow-sm" />
-              </div>
-            </div>
-          </div>
+            </>
+          )}
+        </div>
 
+        {/* Display dashboard options based on access */}
+        {(hasAdminAccess(user?.role) || user?.role === 'finance_manager') && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
               <LayoutDashboard className="w-4 h-4" />
@@ -171,8 +179,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({ open, on
               ))}
             </div>
           </div>
+        )}
 
-          {user?.role === 'admin' && (
+        {user?.role === 'admin' && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <Building2 className="w-4 h-4" />

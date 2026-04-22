@@ -51,6 +51,8 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
 }
 
+import { hasAdminAccess, hasProjectManagementAccess, hasFinanceAccess, isLimitedUser, RoleLabels } from '../types';
+
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const { user, setUser, allUsers } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -59,23 +61,53 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const [showAppearance, setShowAppearance] = React.useState(false);
 
   React.useEffect(() => {
-    if (user?.role === 'employee' && activeTab === 'dashboard') {
+    if (isLimitedUser(user?.role) && activeTab === 'dashboard') {
       setActiveTab('my-projects');
+    }
+    if (user?.role === 'deputy_sthapathy' && activeTab === 'dashboard') {
+      setActiveTab('projects');
     }
   }, [user?.role, activeTab, setActiveTab]);
 
-  const navItems = user?.role === 'admin' ? [
-    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
-    { id: 'projects', label: t('projects'), icon: ListTodo },
-    { id: 'kanban', label: t('kanban'), icon: Trello },
-    { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
-    { id: 'vendors', label: t('vendors'), icon: Building2 },
-    { id: 'team', label: t('team'), icon: UsersIcon }
-  ] : [
-    { id: 'my-projects', label: t('my_projects'), icon: ListTodo },
-    { id: 'kanban', label: t('kanban'), icon: Trello },
-    { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
-  ];
+  const getNavItems = () => {
+    const role = user?.role;
+    
+    if (hasAdminAccess(role)) {
+      return [
+        { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+        { id: 'projects', label: t('projects'), icon: ListTodo },
+        { id: 'kanban', label: t('kanban'), icon: Trello },
+        { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
+        { id: 'vendors', label: t('vendors'), icon: Building2 },
+        { id: 'team', label: t('team'), icon: UsersIcon }
+      ];
+    }
+    
+    if (role === 'deputy_sthapathy') {
+      return [
+        { id: 'projects', label: t('projects'), icon: ListTodo },
+        { id: 'kanban', label: t('kanban'), icon: Trello },
+        { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
+        { id: 'vendors', label: t('vendors'), icon: Building2 }
+      ];
+    }
+    
+    if (role === 'finance_manager') {
+      return [
+        { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+        { id: 'projects', label: t('projects'), icon: ListTodo },
+        { id: 'vendors', label: t('vendors'), icon: Building2 }
+      ];
+    }
+    
+    return [
+      { id: 'my-projects', label: t('my_projects'), icon: ListTodo },
+      { id: 'kanban', label: t('kanban'), icon: Trello },
+      { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
+    ];
+  };
+
+  const navItems = getNavItems();
 
   const UserMenuContent = () => (
     <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 dark:border-white/10 dark:border-slate-800 p-2">
@@ -83,7 +115,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <p className="text-sm font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100">{user?.full_name}</p>
         <div className="flex flex-col mt-1">
           <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{translateData(user?.designation || 'N/A')}</p>
-          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{t(user?.role || '')}</p>
+          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{user?.role ? RoleLabels[user.role] || user.role : ''}</p>
         </div>
       </div>
       <DropdownMenuSeparator />
@@ -91,7 +123,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <User className="mr-2 h-4 w-4" />
         <span>My Profile</span>
       </DropdownMenuItem>
-      {user?.role === 'admin' && (
+      {hasAdminAccess(user?.role) && (
         <DropdownMenuItem onClick={() => setActiveTab('team')}>
           <UsersIcon className="mr-2 h-4 w-4" />
           <span>{t('team')}</span>
@@ -297,7 +329,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                       </Avatar>
                       <div className="hidden md:flex flex-col items-start text-left">
                         <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none">{user?.full_name}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role ? RoleLabels[user.role] || user.role : ''}</p>
                       </div>
                     </Button>
                   }
