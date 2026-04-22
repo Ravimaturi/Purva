@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './ui/dialog';
+import { ConfirmDialog } from './ConfirmDialog';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cn } from '../lib/utils';
@@ -46,6 +47,7 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
   const [addingToCategory, setAddingToCategory] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [uncompleteConfirm, setUncompleteConfirm] = useState<{id: string, taskName: string} | null>(null);
 
   useEffect(() => {
     fetchChecklistAndAudits();
@@ -167,7 +169,23 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
     }
   };
 
+  const confirmUncompleteTask = async () => {
+    if (!uncompleteConfirm) return;
+    await performToggleItem(uncompleteConfirm.id, true, uncompleteConfirm.taskName);
+    setUncompleteConfirm(null);
+  };
+
   const toggleItem = async (id: string, currentStatus: boolean, taskName: string) => {
+    // If the task is being un-completed, prompt the user for confirmation
+    if (currentStatus === true) {
+      setUncompleteConfirm({ id, taskName });
+      return;
+    }
+
+    await performToggleItem(id, currentStatus, taskName);
+  };
+
+  const performToggleItem = async (id: string, currentStatus: boolean, taskName: string) => {
     try {
       // Optimistic update
       const updatedItems = items.map(item => item.id === id ? { ...item, is_completed: !currentStatus } : item);
@@ -670,6 +688,21 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
           <DialogFooter>
             <Button variant="outline" onClick={() => setItemToDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={confirmDelete}>Delete Task</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Uncomplete Task Confirmation Dialog */}
+      <Dialog open={!!uncompleteConfirm} onOpenChange={(open) => !open && setUncompleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redo Completed Task</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to redo the task "{uncompleteConfirm?.taskName}"? This will mark it as incomplete again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUncompleteConfirm(null)}>Cancel</Button>
+            <Button variant="default" onClick={confirmUncompleteTask}>Yes, redo task</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -44,6 +44,8 @@ import {
 } from './ui/dialog';
 import { format } from 'date-fns';
 import { AppearanceSettings } from './AppearanceSettings';
+import { BanknotesIcon } from '@heroicons/react/24/outline'; // Or use IndianRupee from lucide-react? let's use lucide
+import { IndianRupee } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -79,7 +81,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'kanban', label: t('kanban'), icon: Trello },
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
-        { id: 'team', label: t('team'), icon: UsersIcon }
+        { id: 'team', label: t('team'), icon: UsersIcon },
+        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
       ];
     }
     
@@ -88,7 +91,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'kanban', label: t('kanban'), icon: Trello },
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
-        { id: 'vendors', label: t('vendors'), icon: Building2 }
+        { id: 'vendors', label: t('vendors'), icon: Building2 },
+        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
       ];
     }
     
@@ -96,7 +100,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       return [
         { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
         { id: 'projects', label: t('projects'), icon: ListTodo },
-        { id: 'vendors', label: t('vendors'), icon: Building2 }
+        { id: 'vendors', label: t('vendors'), icon: Building2 },
+        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
       ];
     }
     
@@ -104,6 +109,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       { id: 'my-projects', label: t('my_projects'), icon: ListTodo },
       { id: 'kanban', label: t('kanban'), icon: Trello },
       { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
+      { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
     ];
   };
 

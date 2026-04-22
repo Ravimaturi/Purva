@@ -10,6 +10,7 @@ import { ProjectList } from './components/ProjectList';
 import { TeamManagement } from './components/TeamManagement';
 import { Profile } from './components/Profile';
 import { VendorManagement } from './components/VendorManagement';
+import { PettyCash } from './components/PettyCash';
 import { Login } from './components/Login';
 import { UpdatePassword } from './components/UpdatePassword';
 import { Toaster } from './components/ui/sonner';
@@ -108,6 +109,8 @@ function MainApp() {
         return <TeamManagement />;
       case 'vendors':
         return <VendorManagement onProjectClick={handleProjectClick} />;
+      case 'petty_cash':
+        return <PettyCash />;
       case 'profile':
         return <Profile />;
       default:

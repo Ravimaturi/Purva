@@ -32,7 +32,7 @@ export const hasAdminAccess = (role?: UserRole) => role === 'admin' || role === 
 export const hasProjectManagementAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'deputy_sthapathy';
 export const hasFinanceAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'finance_manager';
 export const isLimitedUser = (role?: UserRole) => role === 'assistant_sthapathy' || role === 'junior_sthapathy' || role === 'employee';
-export const canDownloadDrawings = (role?: UserRole) => role !== 'junior_sthapathy' && role !== 'finance_manager';
+export const canDownloadDrawings = (role?: UserRole) => role !== 'junior_sthapathy' && role !== 'finance_manager' && role !== 'employee';
 
 export interface Profile {
   id: string;

@@ -4,7 +4,7 @@ import { loginRequest } from '../lib/msalConfig';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { FileIcon, Download, Upload, Loader2, FolderOpen, Image as ImageIcon, FileText, Eye } from 'lucide-react';
+import { FileIcon, Download, Upload, Loader2, FolderOpen, Image as ImageIcon, FileText, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
@@ -28,24 +28,14 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   const isAuthenticated = useIsAuthenticated();
   const { user, allUsers } = useUser();
   const [isUploading, setIsUploading] = useState(false);
-  const [previewFile, setPreviewFile] = useState<{name: string, url: string} | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{name: string, url: string, isMicrosoft?: boolean, originalUrl?: string} | null>(null);
 
   const getPreviewUrl = (url: string) => {
     if (url.includes('sharepoint.com') || url.includes('onedrive.live.com')) {
       return url + (url.includes('?') ? '&' : '?') + 'action=embedview';
     }
     return url;
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown date';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   const getGraphClient = useCallback(async () => {
@@ -62,6 +52,44 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       }
     });
   }, [instance, accounts]);
+
+  const handleViewFile = async (file: any) => {
+    // If it's a microsoft file, we need to bypass iframe restrictions by fetching the raw BLOB
+    if (file.url.includes('sharepoint.com') || file.url.includes('onedrive.live.com')) {
+      setIsPreviewLoading(file.id);
+      try {
+        const client = await getGraphClient();
+        
+        // Convert webUrl to Graph API encoded share URL
+        const base64 = btoa(file.url);
+        const encodedUrl = 'u!' + base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        
+        // Fetch raw file as blob through the Graph API content endpoint
+        const blob = await client.api(`/shares/${encodedUrl}/driveItem/content`).responseType('blob').get();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        setPreviewFile({ name: file.name, url: blobUrl, isMicrosoft: true, originalUrl: file.url });
+      } catch (graphError) {
+        console.error("Failed to fetch graph blob, falling back to viewer", graphError);
+        setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: true, originalUrl: file.url });
+      } finally {
+        setIsPreviewLoading(null);
+      }
+    } else {
+      setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: false, originalUrl: file.url });
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown date';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const handleLogin = () => {
     if (inProgress !== "none") {
@@ -302,39 +330,51 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                       {formatDate(file.created_at)}
                     </td>
                     <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 text-xs font-bold"
-                          onClick={() => setPreviewFile({ name: file.name, url: getPreviewUrl(file.url) })}
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View
-                        </Button>
-                        {canDownloadDrawings(user?.role) && (
-                          <Button 
-                            variant="default" 
-                            size="sm" 
-                            className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
-                            onClick={() => {
-                              const ext = file.name.split('.').pop()?.toLowerCase();
-                              if (!canDownloadDrawings(user?.role) && (ext === 'dwg' || ext === 'stl')) {
-                                toast.error('You do not have permission to download drawing files.');
-                                return;
-                              }
-                              // Try to construct a direct download link if it's a SharePoint/OneDrive URL
-                              let downloadUrl = file.url;
-                              if (downloadUrl.includes('sharepoint.com') || downloadUrl.includes('onedrive.live.com')) {
-                                downloadUrl = downloadUrl + (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
-                              }
-                              window.open(downloadUrl, '_blank');
-                            }}
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Download
-                          </Button>
-                        )}
+                      <div className="flex items-center justify-end gap-2">
+                        {(() => {
+                            const ext = file.name.split('.').pop()?.toLowerCase();
+                            const isDrawing = ext === 'dwg' || ext === 'stl' || ext === 'rvt';
+                            const hasAccess = !isDrawing || canDownloadDrawings(user?.role);
+                            
+                            if (!hasAccess) {
+                                return (
+                                    <span className="text-xs text-slate-400 dark:text-zinc-500 italic mr-2">Secure File</span>
+                                );
+                            }
+                            return (
+                                <>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      disabled={isPreviewLoading === file.id}
+                                      className="h-8 text-xs font-bold"
+                                      onClick={() => handleViewFile(file)}
+                                    >
+                                      {isPreviewLoading === file.id ? (
+                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <Eye className="w-3 h-3 mr-1" />
+                                      )}
+                                      View
+                                    </Button>
+                                    <Button 
+                                      variant="default" 
+                                      size="sm" 
+                                      className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
+                                      onClick={() => {
+                                        let downloadUrl = file.url;
+                                        if (downloadUrl.includes('sharepoint.com') || downloadUrl.includes('onedrive.live.com')) {
+                                          downloadUrl = downloadUrl + (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
+                                        }
+                                        window.open(downloadUrl, '_blank');
+                                      }}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Download
+                                    </Button>
+                                </>
+                            );
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -348,11 +388,19 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       {/* File Preview Dialog */}
       <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
         <DialogContent className="max-w-4xl w-full h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-slate-950 border-slate-800">
-          <DialogHeader className="p-4 border-b border-white/10 shrink-0">
+          <DialogHeader className="p-4 border-b border-white/10 shrink-0 flex flex-row items-center justify-between">
             <DialogTitle className="text-white text-lg font-bold flex items-center">
               <Eye className="w-5 h-5 mr-2 text-indigo-400" />
               {previewFile?.name || 'File Preview'}
             </DialogTitle>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-slate-400 hover:text-white hover:bg-white/10 h-8 w-8 rounded-full"
+              onClick={() => setPreviewFile(null)}
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </DialogHeader>
           <div className="flex-1 w-full flex flex-col bg-[#0a0a0a] relative items-center justify-center">
             {previewFile && (
@@ -362,7 +410,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                     variant="outline" 
                     className="bg-black/50 hover:bg-black/80 text-white border-white/20 backdrop-blur-md"
                     onClick={() => {
-                      let url = previewFile.url;
+                      let url = previewFile.originalUrl || previewFile.url;
                       if (url.includes('action=embedview')) {
                          url = url.replace(/&action=embedview|\?action=embedview/, '');
                       }
@@ -373,13 +421,38 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                   </Button>
                 </div>
 
-                {/* If it's a direct browser-readable image or PDF and NOT a OneDrive wrapper URL, render directly, else fallback to iframe. */}
-                {previewFile.name.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) && !previewFile.url.includes('sharepoint.com') && !previewFile.url.includes('onedrive.live.com') ? (
+                {/* If it's a Microsoft file but we failed to fetch the blob, it will be caught here and show the secure message */}
+                {(previewFile.isMicrosoft && (previewFile.url.includes('sharepoint.com') || previewFile.url.includes('onedrive.live.com'))) ? (
+                  <div className="flex flex-col items-center justify-center w-full h-full p-8 text-center bg-[#121212]">
+                    <div className="w-20 h-20 bg-[#0078D4]/10 rounded-full flex items-center justify-center mb-6 border border-[#0078D4]/20">
+                      <FileIcon className="w-10 h-10 text-[#0078D4]" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Secure Microsoft Document</h3>
+                    <p className="text-slate-400 max-w-md mb-8 text-sm leading-relaxed">
+                      This file is securely hosted in your organization's Microsoft 365 environment. Microsoft's security policies prevent authenticated documents from being embedded inside third-party apps.
+                    </p>
+                    <Button 
+                      size="lg"
+                      className="bg-[#0078D4] hover:bg-[#006CBF] text-white rounded-xl shadow-lg shadow-[#0078D4]/20"
+                      onClick={() => {
+                        let url = previewFile.originalUrl || previewFile.url;
+                        if (url.includes('action=embedview')) {
+                           url = url.replace(/&action=embedview|\?action=embedview/, '');
+                        }
+                        window.open(url, '_blank');
+                      }}
+                    >
+                      Open in SharePoint / OneDrive
+                    </Button>
+                  </div>
+                ) : previewFile.name.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) ? (
                   <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain p-4" />
-                ) : previewFile.name.match(/\.(pdf)$/i) && !previewFile.url.includes('sharepoint.com') && !previewFile.url.includes('onedrive.live.com') ? (
-                  <object data={previewFile.url} type="application/pdf" className="absolute inset-0 w-full h-full border-0 bg-white">
-                    <iframe src={previewFile.url} className="absolute inset-0 w-full h-full border-0 bg-white" />
-                  </object>
+                ) : previewFile.name.match(/\.(pdf)$/i) ? (
+                  <embed 
+                    src={previewFile.url} 
+                    type="application/pdf" 
+                    className="absolute inset-0 w-full h-full border-0 bg-white" 
+                  />
                 ) : (
                   <iframe 
                     src={previewFile.url} 
