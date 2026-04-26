@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task, Project, isLimitedUser } from '../types';
+import { Task, Project, isLimitedUser, hasAdminAccess } from '../types';
 import { CalendarView } from './CalendarView';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -31,18 +31,16 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch Projects (for deadlines and mapping)
+      // Fetch Projects (for deadlines and mapping - everyone needs all projects to resolve names)
       let projectsQuery = supabase.from('projects').select('*');
-      if (isLimitedUser(user?.role)) {
-        projectsQuery = projectsQuery.eq('assigned_to', user?.full_name);
-      }
       const { data: projectsData, error: projectsError } = await projectsQuery;
       if (projectsError) throw projectsError;
       setProjects(projectsData || []);
 
       // Fetch Tasks
       let tasksQuery = supabase.from('tasks').select('*, projects(name)');
-      if (isLimitedUser(user?.role)) {
+      const canViewAll = hasAdminAccess(user?.role) || user?.role === 'deputy_sthapathy' || user?.role === 'finance_manager';
+      if (!canViewAll) {
         tasksQuery = tasksQuery.eq('assigned_to', user?.full_name);
       }
       const { data: tasksData, error: tasksError } = await tasksQuery;

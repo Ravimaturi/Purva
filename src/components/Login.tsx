@@ -63,7 +63,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-white/10 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#FFFFF0] dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-white/10 flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-none shadow-xl rounded-3xl overflow-hidden">
         <div className={`p-8 text-center relative ${themeColors.solid}`}>
           {isForgotPassword && (

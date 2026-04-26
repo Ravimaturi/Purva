@@ -28,7 +28,7 @@ import {
   CheckIcon as CheckSmallIcon,
   Upload
 } from 'lucide-react';
-import { Project, Comment, AuditLog, PaymentStage, Task, hasProjectManagementAccess, hasAdminAccess, hasFinanceAccess, isLimitedUser } from '../types';
+import { Project, Comment, AuditLog, PaymentStage, Task, hasProjectManagementAccess, hasAdminAccess, hasFinanceAccess, hasAuditLogAccess, isLimitedUser } from '../types';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -58,6 +58,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { CalendarView } from './CalendarView';
 import { Lightbulb } from 'lucide-react';
 import { ProjectChecklist } from './ProjectChecklist';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from './ui/dialog';
 import { DrawingsTracker } from './DrawingsTracker';
 import { ImageCropperDialog } from './ImageCropperDialog';
 
@@ -71,7 +72,7 @@ const formatDate = (dateStr: string | null) => {
   }
 };
 
-import { TransactionComments } from './TransactionComments';
+import { PaymentStageHistory } from './PaymentStageHistory';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface ProjectDetailsProps {
@@ -116,8 +117,6 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const [mentionSearch, setMentionSearch] = useState('');
   const [commentType, setCommentType] = useState<'internal' | 'client'>('internal');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localPaymentAmounts, setLocalPaymentAmounts] = useState<Record<string, string>>({});
-  const [localPaymentDates, setLocalPaymentDates] = useState<Record<string, string>>({});
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isCropOpen, setIsCropOpen] = React.useState(false);
@@ -163,23 +162,23 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }
   }, [project.id]);
   
-  // Update local payment amounts when paymentStages change
-  useEffect(() => {
-    const amounts: Record<string, string> = {};
-    const dates: Record<string, string> = {};
-    paymentStages.forEach(stage => {
-      amounts[stage.id] = (stage.amount_received || 0).toString();
-      dates[stage.id] = stage.received_date || '';
-    });
-    setLocalPaymentAmounts(amounts);
-    setLocalPaymentDates(dates);
-  }, [paymentStages]);
-  
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTaskDeleteDialogOpen, setIsTaskDeleteDialogOpen] = useState(false);
   const [taskIdToDelete, setTaskIdToDelete] = useState<string | null>(null);
   
+  // Task Audit state
+  const [isTaskAuditDialogOpen, setIsTaskAuditDialogOpen] = useState(false);
+  const [taskToAudit, setTaskToAudit] = useState<Task | null>(null);
+  const [taskAuditComment, setTaskAuditComment] = useState('');
+  const [taskAuditFileUrl, setTaskAuditFileUrl] = useState('');
+  const [taskAuditAssignee, setTaskAuditAssignee] = useState('');
+  const [isSubmittingTaskAudit, setIsSubmittingTaskAudit] = useState(false);
+
+  const [takeOverTask, setTakeOverTask] = useState<Task | null>(null);
+  const [takeOverReason, setTakeOverReason] = useState("");
+  const [isTakingOver, setIsTakingOver] = useState(false);
+
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -408,6 +407,110 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }
   };
 
+  const handleRequestAssignment = async (task: Task) => {
+    try {
+      const requestMsg = `[Assignment Request] User ${user?.full_name} has requested to work on this task (Pending Lead/Admin Approval).`;
+      const currentComment = task.comment ? `${task.comment}\n\n${requestMsg}` : requestMsg;
+
+      const { error } = await supabase.from('tasks').update({
+        comment: currentComment
+      }).eq('id', task.id);
+      
+      if (error) throw error;
+      
+      // Notify the project assignee
+      const assigneeNameOrId = project.assigned_to;
+      if (assigneeNameOrId) {
+        const assignee = allUsers.find(u => u.full_name === assigneeNameOrId || u.id === assigneeNameOrId);
+        if (assignee && assignee.id !== user?.id) {
+          await addNotification('Task Assignment Request', `${user?.full_name} has requested to work on task "${task.title}" in project "${project.name}".`, assignee.id);
+        }
+      }
+      
+      toast.success('Assignment request sent for lead approval');
+      fetchDetails();
+    } catch (err) {
+      toast.error('Failed to request assignment');
+    }
+  };
+
+  const handleSelfAssignSubmit = async () => {
+    if (!takeOverTask || !user?.full_name) return;
+    setIsTakingOver(true);
+    try {
+      const timestamp = new Date().toLocaleString();
+      const takeOverMsg = `[${timestamp}] Task taken over by ${user.full_name}${takeOverReason ? ` - Reason: ${takeOverReason}` : ''}.`;
+      const currentComment = takeOverTask.comment ? `${takeOverTask.comment}\n\n${takeOverMsg}` : takeOverMsg;
+      
+      const { error } = await supabase.from('tasks').update({
+        assigned_to: user.full_name,
+        comment: currentComment
+      }).eq('id', takeOverTask.id);
+      
+      if (error) throw error;
+      toast.success(`Task reassigned to you`);
+      setTakeOverTask(null);
+      setTakeOverReason("");
+      fetchDetails();
+    } catch (err) {
+      toast.error('Failed to reassign task');
+    } finally {
+      setIsTakingOver(false);
+    }
+  };
+
+  const handleSelfAssign = (task: Task) => {
+    setTakeOverReason("");
+    setTakeOverTask(task);
+  };
+
+  const handleSaveTaskAudit = async () => {
+    if (!taskToAudit) return;
+    setIsSubmittingTaskAudit(true);
+    try {
+      const finalAttachmentUrl = taskAuditFileUrl === 'none' ? null : (taskAuditFileUrl || null);
+      const finalAssignee = taskAuditAssignee === 'Unassigned' ? null : taskAuditAssignee;
+      
+      let newComment = taskToAudit.comment || '';
+      const parts = [];
+      const timestamp = new Date().toLocaleString();
+      
+      if (taskAuditComment.trim()) {
+         parts.push(`[${timestamp}] ${user?.full_name}: ${taskAuditComment.trim()}`);
+      }
+      
+      if (taskToAudit.assigned_to !== finalAssignee) {
+         parts.push(`[${timestamp}] Assigned to ${finalAssignee || 'Unassigned'} by ${user?.full_name}`);
+      }
+      
+      if (parts.length > 0) {
+         newComment = newComment ? `${newComment}\n\n${parts.join('\n')}` : parts.join('\n');
+      }
+
+      const { error } = await supabase.from('tasks').update({
+        comment: newComment || null,
+        attachment_url: finalAttachmentUrl,
+        assigned_to: finalAssignee
+      }).eq('id', taskToAudit.id);
+      
+      if (error) {
+        if (error.code === 'PGRST204') {
+          toast.error("Database missing 'comment' column on tasks. Admin needs to run migration SQL.");
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success("Task updated with audit info");
+        setIsTaskAuditDialogOpen(false);
+        fetchDetails();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update task audit');
+    } finally {
+      setIsSubmittingTaskAudit(false);
+    }
+  };
+
   const handleCommentChange = (text: string) => {
     setNewComment(text);
     const lastWord = text.split(/\s/).pop() || '';
@@ -494,7 +597,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       if (!stage) return;
 
       const newStatus = amount >= stage.amount ? 'Paid' : 'Pending';
-      const receivedDate = date !== undefined ? date : (localPaymentDates[stageId] || null);
+      const receivedDate = date !== undefined ? date : null;
 
       // Direct update attempt
       const { error } = await supabase
@@ -831,9 +934,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     Vendor Orders
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="audit" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
-                  {t('audit_log')}
-                </TabsTrigger>
+                {hasAuditLogAccess(user?.role) && (
+                  <TabsTrigger value="audit" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap">
+                    {t('audit_log')}
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
@@ -1103,21 +1208,68 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     Done {formatDate(task.completed_at)}
                                   </span>
                                 )}
+                                {task.comment && (
+                                  <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 italic">{translateData(task.comment)}</p>
+                                    {task.attachment_url && (
+                                      <a href={task.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 mt-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider">
+                                        <Paperclip className="w-3 h-3" />
+                                        View Attached File
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {hasProjectManagementAccess(user?.role) && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {task.assigned_to !== user?.full_name && task.status !== 'done' && !hasProjectManagementAccess(user?.role) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleRequestAssignment(task)}
+                                  className="h-8 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
+                                >
+                                  Request
+                                </Button>
+                              )}
+                              {task.assigned_to !== user?.full_name && task.status !== 'done' && hasProjectManagementAccess(user?.role) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleSelfAssign(task)}
+                                  className="h-8 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 px-2"
+                                >
+                                  Take Over
+                                </Button>
+                              )}
                               <Button 
                                 variant="ghost" 
-                                size="icon" 
+                                size="sm" 
                                 onClick={() => {
-                                  setTaskIdToDelete(task.id);
-                                  setIsTaskDeleteDialogOpen(true);
+                                  setTaskToAudit(task);
+                                  setTaskAuditComment('');
+                                  setTaskAuditFileUrl(task.attachment_url || '');
+                                  setTaskAuditAssignee(task.assigned_to || 'Unassigned');
+                                  setIsTaskAuditDialogOpen(true);
                                 }}
-                                className="opacity-0 group-hover:opacity-100 h-8 w-8 text-slate-300 hover:text-red-500 transition-all"
+                                className="h-8 text-xs text-slate-500 hover:text-indigo-600 px-2"
                               >
-                                <TrashIcon className="w-4 h-4" />
+                                <MessageSquare className="w-3 h-3 mr-1.5" /> {t('audit')}
                               </Button>
-                            )}
+                              {hasProjectManagementAccess(user?.role) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => {
+                                    setTaskIdToDelete(task.id);
+                                    setIsTaskDeleteDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 text-slate-300 hover:text-red-500 transition-all"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))
                       )}
@@ -1136,7 +1288,17 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                   <TabsContent value="kanban" className="mt-0 p-4 sm:p-8 flex-1">
                     <div className="mb-6">
                       <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">Task Kanban Board</h3>
-                      <KanbanBoard tasks={tasks} onStatusChange={toggleTaskStatus} />
+                      <KanbanBoard 
+                        tasks={tasks} 
+                        onStatusChange={toggleTaskStatus} 
+                        onTaskClick={(task) => {
+                          setTaskToAudit(task);
+                          setTaskAuditComment('');
+                          setTaskAuditFileUrl(task.attachment_url || '');
+                          setTaskAuditAssignee(task.assigned_to || 'Unassigned');
+                          setIsTaskAuditDialogOpen(true);
+                        }}
+                      />
                     </div>
                   </TabsContent>
 
@@ -1305,43 +1467,16 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                   <p className="text-sm font-black text-slate-900 dark:text-slate-100">₹ {stage.amount.toLocaleString()}</p>
                                 </div>
                                 
-                                <div className="flex flex-col items-start sm:items-end gap-1 min-w-[100px]">
+                                <div className="flex flex-col items-start sm:items-end gap-1 min-w-[100px] pl-4 sm:border-l border-slate-100 dark:border-white/10">
                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('amount_received')}</p>
                                   <div className="flex items-center gap-2">
-                                    <Input 
-                                      type="number"
-                                      value={localPaymentAmounts[stage.id] || ''}
-                                      placeholder="0"
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setLocalPaymentAmounts(prev => ({ ...prev, [stage.id]: val }));
-                                      }}
-                                      onBlur={(e) => {
-                                        const val = parseFloat(e.target.value) || 0;
-                                        updatePaymentReceived(stage.id, val);
-                                      }}
-                                      className="h-8 w-24 text-xs font-bold rounded-lg border-slate-200 dark:border-white/10 dark:bg-[#181818]"
-                                    />
+                                    <p className="text-sm font-black text-emerald-600 dark:text-emerald-500">₹ {stage.amount_received.toLocaleString()}</p>
                                     {stage.amount_received >= stage.amount ? (
                                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                     ) : (
                                       <Clock className="w-4 h-4 text-amber-500" />
                                     )}
                                   </div>
-                                </div>
-    
-                                <div className="flex flex-col items-start sm:items-end gap-1 min-w-[120px]">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('received_date')}</p>
-                                  <Input 
-                                    type="date"
-                                    value={localPaymentDates[stage.id] || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setLocalPaymentDates(prev => ({ ...prev, [stage.id]: val }));
-                                      updatePaymentReceived(stage.id, parseFloat(localPaymentAmounts[stage.id]) || 0, val);
-                                    }}
-                                    className="h-8 w-32 text-xs font-bold rounded-lg border-slate-200 dark:border-white/10 dark:bg-[#181818]"
-                                  />
                                 </div>
     
                                 <Button 
@@ -1356,9 +1491,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             </div>
                             
                             <div className="w-full pt-4 mt-2 border-t border-slate-50 dark:border-white/5">
-                              <TransactionComments 
+                              <PaymentStageHistory 
                                 commentsJson={stage.comments} 
                                 onUpdate={(newCommentsJson) => updatePaymentComments(stage.id, newCommentsJson)} 
+                                onReceiptAdded={(amount, date) => {
+                                  const newAmount = (stage.amount_received || 0) + amount;
+                                  updatePaymentReceived(stage.id, newAmount, date);
+                                }}
                               />
                             </div>
                           </div>
@@ -1386,9 +1525,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     />
                   </TabsContent>
 
-                  <TabsContent value="audit" className="mt-0">
-                    <div className="space-y-8 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-white/10">
-                      {auditLogs.map((log) => (
+                  {hasAuditLogAccess(user?.role) && (
+                    <TabsContent value="audit" className="mt-0">
+                      <div className="space-y-8 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100 dark:before:bg-white/10">
+                        {auditLogs.map((log) => (
                         <div key={log.id} className="relative pl-12">
                           <div className="absolute left-0 top-0 w-10 h-10 rounded-2xl bg-white dark:bg-[#121212] border border-slate-100 dark:border-white/10 flex items-center justify-center shadow-sm z-10">
                             <History className="w-4 h-4 text-slate-400" />
@@ -1410,6 +1550,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                       ))}
                     </div>
                   </TabsContent>
+                  )}
                 </div>
               </div>
             </Tabs>
@@ -1568,14 +1709,16 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           </div>
           
           {/* Sidebar Footer */}
-          <div className="p-6 border-t border-slate-100 dark:border-white/10 bg-white dark:bg-[#121212]">
-            <Button 
-              className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold h-12 shadow-lg shadow-indigo-100 dark:shadow-none transition-all active:scale-95"
-              onClick={() => isEditing ? handleUpdateProject() : setIsEditing(true)}
-            >
-              {isEditing ? 'Save Changes' : 'Edit Details'}
-            </Button>
-          </div>
+          {hasProjectManagementAccess(user?.role) && (
+            <div className="p-6 border-t border-slate-100 dark:border-white/10 bg-white dark:bg-[#121212]">
+              <Button 
+                className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold h-12 shadow-lg shadow-indigo-100 dark:shadow-none transition-all active:scale-95"
+                onClick={() => isEditing ? handleUpdateProject() : setIsEditing(true)}
+              >
+                {isEditing ? 'Save Changes' : 'Edit Details'}
+              </Button>
+            </div>
+          )}
         </aside>
       </div>
       <ConfirmDialog 
@@ -1600,6 +1743,96 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           onCropComplete={handleCropComplete}
         />
       )}
+      <Dialog open={!!takeOverTask} onOpenChange={(open) => !open && setTakeOverTask(null)}>
+        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[#121212] border-slate-200 dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest">Take Over Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Reason for Taking Over</label>
+              <Textarea 
+                className="bg-slate-50 dark:bg-slate-900 border-none dark:border-white/10 dark:text-zinc-100 resize-none h-24"
+                placeholder="Enter a reason for taking over this task..."
+                value={takeOverReason}
+                onChange={e => setTakeOverReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={() => setTakeOverTask(null)} disabled={isTakingOver}>Cancel</Button>
+              <Button onClick={handleSelfAssignSubmit} disabled={isTakingOver} className="bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                 {isTakingOver ? 'Processing...' : 'Confirm Take Over'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isTaskAuditDialogOpen} onOpenChange={setIsTaskAuditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[#121212] border-slate-200 dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest">{t('audit_task')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {taskToAudit?.comment && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Audit History</label>
+                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg p-3 text-sm text-slate-700 dark:text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {taskToAudit.comment}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Add {t('audit_comment')}</label>
+              <Textarea 
+                className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-white/10 dark:text-zinc-100 resize-none h-24"
+                placeholder={t('enter_audit_comment')}
+                value={taskAuditComment}
+                onChange={e => setTaskAuditComment(e.target.value)}
+              />
+            </div>
+            {(hasProjectManagementAccess(user?.role) || user?.role === 'finance_manager') && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Assign To</label>
+                <Select value={taskAuditAssignee} onValueChange={setTaskAuditAssignee}>
+                  <SelectTrigger className="bg-slate-50 dark:bg-slate-900 border-none dark:border-white/10 dark:text-zinc-100 h-11">
+                    <SelectValue placeholder="Assign To" />
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-[#121212] dark:border-white/10">
+                    <SelectItem value="Unassigned" className="dark:text-zinc-300 dark:hover:bg-[#181818]">Unassigned</SelectItem>
+                    {allUsers.map(u => (
+                      <SelectItem key={u.id} value={u.full_name} className="dark:text-zinc-300 dark:hover:bg-[#181818]">{u.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t('attach_file_optional')}</label>
+              <Select value={taskAuditFileUrl} onValueChange={setTaskAuditFileUrl}>
+                <SelectTrigger className="bg-slate-50 dark:bg-slate-900 border-none dark:border-white/10 dark:text-zinc-100 h-11">
+                  <SelectValue placeholder={t('select_file')} />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-[#121212] dark:border-white/10 max-h-72 w-[280px] sm:w-[380px]">
+                  <SelectItem value="none" className="dark:text-zinc-300 dark:hover:bg-[#181818] py-3">{t('no_file_attached')}</SelectItem>
+                  {files.map(f => (
+                    <SelectItem key={f.id} value={f.url} className="dark:text-zinc-300 dark:hover:bg-[#181818] py-3 pr-8">
+                      <div className="flex flex-col w-full overflow-hidden">
+                        <span className="font-medium truncate block" title={f.name}>{f.name}</span>
+                        {f.description && <span className="text-xs text-slate-500 truncate block w-full mt-0.5" title={f.description}>{f.description}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button onClick={handleSaveTaskAudit} disabled={isSubmittingTaskAudit} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
+                 {isSubmittingTaskAudit ? 'Saving...' : t('save_audit')}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

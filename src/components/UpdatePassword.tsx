@@ -47,7 +47,7 @@ export const UpdatePassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-white/10 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#FFFFF0] dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-white/10 flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-none shadow-xl rounded-3xl overflow-hidden">
         <div className="bg-indigo-600 p-8 text-center">
           <div className="w-16 h-16 bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">

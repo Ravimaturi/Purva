@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Button } from './ui/button';
 import { CheckCircle2, Circle, Plus, Loader2, Trash2, User as UserIcon, Clock, RotateCcw, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { DESIGN_ITEMS, OBSERVATION_ITEMS, STONE_CONSTRUCTION_ITEMS, CEMENT_CONSTRUCTION_ITEMS } from '../lib/checklistTemplates';
+import { Project, Comment, AuditLog, PaymentStage, Task, hasProjectManagementAccess, hasAdminAccess, hasFinanceAccess, isLimitedUser } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { format } from 'date-fns';
@@ -37,6 +38,7 @@ interface ItemAudit {
 
 export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, onUpdate }) => {
   const { user } = useUser();
+  const { getDashboardColors } = useTheme();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [itemAudits, setItemAudits] = useState<Record<string, ItemAudit>>({});
   const [projectData, setProjectData] = useState<{name: string, client_name: string, status: string} | null>(null);
@@ -431,6 +433,19 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
   }
 
   if (items.length === 0) {
+    const canGenerate = hasProjectManagementAccess(user?.role) || hasFinanceAccess(user?.role);
+    
+    if (!canGenerate) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-2">Execution Plan Pending</h3>
+          <p className="text-sm text-slate-500 dark:text-zinc-400 text-center max-w-md">
+            The execution plan for this project has not been generated yet. Please contact an Admin or Chief Sthapathy.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
         <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-2">Generate Execution Plan</h3>
@@ -493,7 +508,6 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
   const completedItems = items.filter(i => i.is_completed).length;
   const progressPercentage = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
 
-  const { getDashboardColors } = useTheme();
   const themeColors = getDashboardColors();
 
   return (
@@ -510,10 +524,12 @@ export const ProjectChecklist: React.FC<ProjectChecklistProps> = ({ projectId, o
               <Download className="w-4 h-4 mr-2" />
               Report
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsResetConfirmOpen(true)} className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset Plan
-            </Button>
+            {hasProjectManagementAccess(user?.role) && (
+              <Button variant="outline" size="sm" onClick={() => setIsResetConfirmOpen(true)} className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset Plan
+              </Button>
+            )}
             <span className={cn("text-2xl font-black", themeColors.text)}>{progressPercentage}%</span>
           </div>
         </div>

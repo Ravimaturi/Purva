@@ -195,8 +195,8 @@ export const TeamManagement: React.FC = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('team')}</h2>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 w-full sm:flex-1 sm:max-w-md">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
@@ -207,9 +207,9 @@ export const TeamManagement: React.FC = () => {
             />
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button 
-            className="bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm dark:shadow-none gap-2"
+            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm dark:shadow-none gap-2"
             onClick={() => {
               setSelectedUser(null);
               setEditData({ full_name: '', email: '', role: 'employee', emp_code: '', designation: '', DOJ: '' });
@@ -222,8 +222,8 @@ export const TeamManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-sm overflow-hidden">
-        <Table>
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-sm overflow-x-auto">
+        <Table className="min-w-[800px]">
           <TableHeader className="bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-slate-800/50">
             <TableRow className="hover:bg-transparent border-slate-100 dark:border-slate-800">
               <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">

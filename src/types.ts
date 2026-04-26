@@ -31,7 +31,8 @@ export const RoleLabels: Record<UserRole, string> = {
 export const hasAdminAccess = (role?: UserRole) => role === 'admin' || role === 'chief_sthapathy';
 export const hasProjectManagementAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'deputy_sthapathy';
 export const hasFinanceAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'finance_manager';
-export const isLimitedUser = (role?: UserRole) => role === 'assistant_sthapathy' || role === 'junior_sthapathy' || role === 'employee';
+export const hasAuditLogAccess = (role?: UserRole) => hasAdminAccess(role) || role === 'finance_manager';
+export const isLimitedUser = (role?: UserRole) => role === 'junior_sthapathy' || role === 'employee';
 export const canDownloadDrawings = (role?: UserRole) => role !== 'junior_sthapathy' && role !== 'finance_manager' && role !== 'employee';
 
 export interface Profile {
@@ -71,6 +72,8 @@ export interface Task {
   deadline: string | null;
   completed_at: string | null;
   assigned_to: string | null;
+  comment?: string | null;
+  attachment_url?: string | null;
   created_at: string;
 }
 
@@ -99,6 +102,18 @@ export interface TransactionComment {
   text: string;
   author: string;
   date: string;
+}
+
+export interface PaymentReceipt {
+  id: string;
+  amount: number;
+  date: string;
+  author: string;
+}
+
+export interface PaymentStageHistoryData {
+  comments: TransactionComment[];
+  receipts: PaymentReceipt[];
 }
 
 export interface PaymentStage {

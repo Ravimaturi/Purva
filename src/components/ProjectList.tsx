@@ -31,7 +31,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Project } from '../types';
+import { Project, hasProjectManagementAccess } from '../types';
 import { PROJECT_STAGES, STAGE_LABELS } from '../constants';
 import { ProjectDetails } from './ProjectDetails';
 import { NewProjectDialog } from './NewProjectDialog';
@@ -133,19 +133,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
         });
       }
       
-      if (employeeView && user) {
-        const { data: userTasks } = await supabase
-          .from('tasks')
-          .select('project_id')
-          .eq('assigned_to', user.full_name);
-          
-        const projectIdsWithTasks = new Set(userTasks?.map(t => t.project_id) || []);
-        
-        finalProjects = finalProjects.filter(p => 
-          p.assigned_to === user.full_name || projectIdsWithTasks.has(p.id)
-        );
-      }
-      
       setProjects(finalProjects);
     } catch (err: any) {
       console.error('Error fetching projects:', err);
@@ -240,7 +227,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
             />
           </div>
         </div>
-        {!employeeView && (
+        {hasProjectManagementAccess(user?.role) && (
           <Button 
             onClick={() => setIsNewDialogOpen(true)}
             className={cn("rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold text-sm transition-all active:scale-95 text-white", themeColors.solid, themeColors.solidHover)}
@@ -280,34 +267,53 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
               className="border-none shadow-sm dark:bg-[#121212] dark:border dark:border-white/10 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer overflow-hidden rounded-3xl"
             >
               <CardContent className="p-5 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 dark:text-zinc-100 tracking-tight truncate">{translateData(project.name)}</h3>
+                <div className="flex items-start gap-4">
+                  {project.logo_url ? (
+                    <img src={project.logo_url} alt="Logo" className="w-12 h-12 rounded-2xl object-contain shadow-sm border border-slate-200 dark:border-white/10 bg-white dark:bg-[#121212] shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-[#121212] dark:border dark:border-white/10 flex items-center justify-center text-slate-500 font-bold text-lg shrink-0">
+                      {project.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between h-12">
+                    <div className="flex items-start justify-between gap-2">
+                       <h3 className="font-bold text-slate-900 dark:text-zinc-100 tracking-tight truncate flex-1 leading-tight">{translateData(project.name)}</h3>
+                       <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-tighter shrink-0 mb-auto">
+                         {translateData(STAGE_LABELS[project.status])}
+                       </Badge>
+                    </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{translateData(project.client_name)}</p>
                   </div>
-                  <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter shrink-0">
-                    {translateData(STAGE_LABELS[project.status])}
-                  </Badge>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-7 w-7 border-2 border-white shadow-sm">
-                      <AvatarFallback className="bg-indigo-600 text-white font-bold text-[8px]">
-                        {getInitials(project.assigned_to || t('unassigned'))}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider truncate max-w-[100px]">
-                      {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Progress</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
+                <div className="flex items-end justify-between pt-2 border-t border-slate-50 dark:border-white/5">
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-0.5 text-left">Deadline & Assigned</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-6 w-6 border-2 border-white dark:border-[#121212] shadow-sm">
+                        <AvatarFallback className="bg-indigo-600 text-white font-bold text-[8px]">
+                          {getInitials(project.assigned_to || t('unassigned'))}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider truncate max-w-[90px]">
+                          {project.assigned_to ? translateData(project.assigned_to) : t('unassigned')}
+                        </span>
+                        <span className="text-[9px] font-medium text-slate-400 tracking-wider">
+                          {STAGE_LABELS[project.status] === 'Handover' 
+                            ? formatDate(project.completed_at || project.deadline) 
+                            : formatDate(project.deadline)}
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-slate-900 dark:text-slate-100">{project.progress}%</span>
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-1.5 pb-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Progress</span>
+                      <span className="text-[11px] font-black text-slate-900 dark:text-slate-100">{project.progress}%</span>
+                    </div>
+                    <div className="w-24 bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden mt-0.5">
+                      <div className="bg-indigo-600 h-full" style={{ width: `${project.progress}%` }} />
                     </div>
                   </div>
                 </div>
@@ -500,9 +506,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                           >
                             <Eye className="w-4 h-4 mr-2 text-indigo-600" /> View Details
                           </DropdownMenuItem>
-                          {!employeeView && (
+                          {hasProjectManagementAccess(user?.role) && (
                             <DropdownMenuItem 
-                              className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest text-red-600 focus:text-red-600 focus:bg-red-50"
+                              className="rounded-xl py-2 font-bold text-xs uppercase tracking-widest text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
                               onClick={() => {
                                 setProjectIdToDelete(project.id);
                                 setIsDeleteDialogOpen(true);

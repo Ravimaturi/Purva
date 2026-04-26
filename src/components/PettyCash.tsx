@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useMsal } from '@azure/msal-react';
+import { loginRequest } from '../lib/msalConfig';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2 } from 'lucide-react';
+import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   BarChart,
@@ -34,17 +37,45 @@ interface PettyCashEntry {
   raised_by_id: string;
   raised_by_name: string;
   created_at: string;
+  receipt_url?: string;
 }
 
 export const PettyCash = () => {
   const { user } = useUser();
   const isAdmin = hasAdminAccess(user?.role);
+  const { instance, accounts } = useMsal();
+  
+  const getGraphClient = useCallback(async () => {
+    if (accounts.length === 0) {
+      // Trigger login if not authenticated
+      const top = window.screenY + (window.outerHeight - 600) / 2;
+      const left = window.screenX + (window.outerWidth - 500) / 2;
+      window.open(
+        `${window.location.origin}?auth_action=login`, 
+        'oauth_popup', 
+        `width=${500},height=${600},left=${left},top=${top}`
+      );
+      throw new Error("Not logged into Microsoft. Please authorize the popup.");
+    }
+    
+    const response = await instance.acquireTokenSilent({
+      ...loginRequest,
+      account: accounts[0]
+    });
+    
+    return Client.init({
+      authProvider: (done) => {
+        done(null, response.accessToken);
+      }
+    });
+  }, [instance, accounts]);
   
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Filters
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -53,7 +84,7 @@ export const PettyCash = () => {
 
   // Form State
   const defaultDate = new Date().toISOString().split('T')[0];
-  const [form, setForm] = useState({
+  const emptyForm = {
     date: defaultDate,
     project_name: '',
     category: CATEGORIES[0],
@@ -61,7 +92,13 @@ export const PettyCash = () => {
     reason: '',
     advance_amount: '',
     expenditure_amount: ''
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -69,6 +106,52 @@ export const PettyCash = () => {
   useEffect(() => {
     fetchQueries();
   }, []);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompressing(true);
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const webpFile = new File([blob], `${Date.now()}_receipt.webp`, { type: 'image/webp' });
+            setReceiptFile(webpFile);
+          }
+          setIsCompressing(false);
+        }, 'image/webp', 0.8);
+      };
+    };
+  };
 
   const fetchQueries = async () => {
     setIsLoading(true);
@@ -102,6 +185,22 @@ export const PettyCash = () => {
     }
   };
 
+  const handleEdit = (entry: PettyCashEntry) => {
+    setEditingId(entry.id);
+    setForm({
+      date: entry.date,
+      project_name: entry.project_name || '',
+      category: entry.category,
+      bill_name: entry.bill_name,
+      reason: entry.reason,
+      advance_amount: entry.advance_amount ? entry.advance_amount.toString() : '',
+      expenditure_amount: entry.expenditure_amount ? entry.expenditure_amount.toString() : ''
+    });
+    setExistingReceiptUrl(entry.receipt_url || null);
+    setReceiptFile(null);
+    setShowForm(true);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
@@ -115,44 +214,144 @@ export const PettyCash = () => {
     try {
       const adv = parseFloat(form.advance_amount) || 0;
       const exp = parseFloat(form.expenditure_amount) || 0;
-
-      const newEntry = {
-        date: form.date,
-        project_name: form.project_name,
-        category: form.category,
-        bill_name: form.bill_name,
-        reason: form.reason,
-        advance_amount: adv,
-        expenditure_amount: exp,
-        raised_by_id: user.id,
-        raised_by_name: user.full_name
-      };
-
-      const { data, error } = await supabase.from('petty_cash').insert(newEntry).select();
-      if (error) throw error;
-
-      if (data) {
-        setEntries([data[0], ...entries]);
-        toast.success("Petty Cash entry added successfully!");
+      
+      let finalReceiptUrl = existingReceiptUrl;
+      
+      if (receiptFile) {
+        try {
+          const client = await getGraphClient();
+          const folderPath = `PurvaVedic_PettyCash_Receipts/${user.id}`;
+          
+          if (receiptFile.size <= 4 * 1024 * 1024) {
+             await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/content`).put(receiptFile);
+          } else {
+             const uploadSession = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/createUploadSession`).post({
+               item: {
+                 "@microsoft.graph.conflictBehavior": "replace",
+                 "name": receiptFile.name
+               }
+             });
+             
+             const uploadUrl = uploadSession.uploadUrl;
+             const maxChunkSize = 320 * 1024 * 10;
+             const size = receiptFile.size;
+             let start = 0;
+             
+             while (start < size) {
+               const end = Math.min(start + maxChunkSize, size);
+               const chunk = receiptFile.slice(start, end);
+               const response = await fetch(uploadUrl, {
+                 method: 'PUT',
+                 headers: { 'Content-Range': `bytes ${start}-${end - 1}/${size}` },
+                 body: chunk
+               });
+               if (!response.ok) throw new Error(`Upload failed at chunk ${start}-${end}`);
+               start = end;
+             }
+          }
+          
+          let sharedUrl = '';
+          try {
+            const permission = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/createLink`).post({
+              type: 'view',
+              scope: 'organization'
+            });
+            sharedUrl = permission.link.webUrl;
+          } catch (linkError) {
+             console.error("Error creating sharing link:", linkError);
+             const item = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}`).get();
+             sharedUrl = item.webUrl;
+          }
+          finalReceiptUrl = sharedUrl;
+        } catch (uploadError) {
+           console.error("Upload error", uploadError);
+           toast.error("Failed to upload receipt to Microsoft OneDrive. Please make sure you are logged in.");
+           setIsSubmitting(false);
+           return;
+        }
       }
 
-      if (addAnother) {
-        setForm({
-          ...form,
-          bill_name: '',
-          reason: '',
-          advance_amount: '',
-          expenditure_amount: ''
-        });
-      } else {
+      if (editingId) {
+        const updatePayload: any = {
+          date: form.date,
+          project_name: form.project_name,
+          category: form.category,
+          bill_name: form.bill_name,
+          reason: form.reason,
+          advance_amount: adv,
+          expenditure_amount: exp
+        };
+        
+        if (finalReceiptUrl) updatePayload.receipt_url = finalReceiptUrl;
+
+        const { data, error } = await supabase.from('petty_cash').update(updatePayload).eq('id', editingId).select();
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+           throw new Error("Missing UPDATE policy on petty_cash table. Admin needs to run: CREATE POLICY \"Enable update for users\" ON petty_cash FOR UPDATE USING (true);");
+        }
+        
+        const updatedEntries = entries.map(e => String(e.id) === editingId ? { ...e, ...updatePayload } : e);
+        setEntries(updatedEntries);
+        toast.success("Petty Cash entry updated successfully!");
+        setEditingId(null);
         setShowForm(false);
+        setForm(emptyForm);
+        setReceiptFile(null);
+        setExistingReceiptUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        const newEntry: any = {
+          date: form.date,
+          project_name: form.project_name,
+          category: form.category,
+          bill_name: form.bill_name,
+          reason: form.reason,
+          advance_amount: adv,
+          expenditure_amount: exp,
+          raised_by_id: user.id,
+          raised_by_name: user.full_name
+        };
+        
+        if (finalReceiptUrl) newEntry.receipt_url = finalReceiptUrl;
+
+        const { data, error } = await supabase.from('petty_cash').insert(newEntry).select();
+        if (error) throw error;
+
+        if (data) {
+          setEntries([data[0], ...entries]);
+          toast.success("Petty Cash entry added successfully!");
+        }
+
+        if (addAnother) {
+          setForm({
+            ...form,
+            bill_name: '',
+            reason: '',
+            advance_amount: '',
+            expenditure_amount: ''
+          });
+          setReceiptFile(null);
+          setExistingReceiptUrl(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        } else {
+          setShowForm(false);
+          setForm(emptyForm);
+          setReceiptFile(null);
+          setExistingReceiptUrl(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
       }
     } catch (error: any) {
       console.error(error);
-      if (error?.message?.includes("does not exist")) {
+      if (error?.message?.includes("Missing UPDATE policy")) {
+        toast.error("You don't have permission to update. Ask Admin to add RLS UPDATE policy.");
+      } else if (error?.code === 'PGRST204' && error?.message?.includes('receipt_url')) {
+        toast.error("Database column 'receipt_url' is missing. Please run the SQL command provided by the AI.");
+      } else if (error?.message?.includes("does not exist")) {
         toast.error("Database table 'petty_cash' missing! Contact Admin to run SQL setup.");
       } else {
-        toast.error("Failed to add entry.");
+        toast.error("Failed to save entry.");
       }
     } finally {
       setIsSubmitting(false);
@@ -264,7 +463,15 @@ export const PettyCash = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Petty Cash Tracking</h1>
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="mt-4 sm:mt-0 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
+        <Button onClick={() => {
+          if (showForm) {
+            setShowForm(false);
+            setEditingId(null);
+            setForm(emptyForm);
+          } else {
+            setShowForm(true);
+          }
+        }} className="mt-4 sm:mt-0 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
           <Plus className="w-4 h-4 mr-2" />
           {showForm ? 'View Dashboard' : 'New Entry'}
         </Button>
@@ -272,7 +479,9 @@ export const PettyCash = () => {
 
       {showForm ? (
         <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 max-w-3xl mx-auto">
-          <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white border-b border-slate-100 dark:border-white/5 pb-4">Add Petty Cash Entry</h2>
+          <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white border-b border-slate-100 dark:border-white/5 pb-4">
+            {editingId ? 'Edit Petty Cash Entry' : 'Add Petty Cash Entry'}
+          </h2>
           <form className="space-y-6" onSubmit={(e) => handleSubmit(e, false)}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
@@ -377,25 +586,86 @@ export const PettyCash = () => {
               </div>
 
             </div>
+
+            <div className="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Receipt Image (Microsoft OneDrive)</label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                {accounts.length === 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const width = 600;
+                      const height = 700;
+                      const left = window.screenX + (window.outerWidth - width) / 2;
+                      const top = window.screenY + (window.outerHeight - height) / 2;
+                      window.open(`${window.location.origin}?auth_action=login`, 'oauth_popup', `width=${width},height=${height},left=${left},top=${top}`);
+                      const pollInterval = setInterval(() => {
+                        if (instance.getAllAccounts().length > 0) {
+                          clearInterval(pollInterval);
+                          instance.setActiveAccount(instance.getAllAccounts()[0]);
+                          toast.success("Successfully logged in to Microsoft");
+                        }
+                      }, 1000);
+                      setTimeout(() => clearInterval(pollInterval), 180000);
+                    }}
+                    className="border-[#0078D4] text-[#0078D4] hover:bg-[#0078D4]/5 dark:border-[#0078D4] dark:hover:bg-[#0078D4]/20"
+                  >
+                    Connect Microsoft Account
+                  </Button>
+                ) : (
+                  <>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      accept="image/*" 
+                      onChange={handleFileUpload}
+                      className="hidden" 
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-slate-200 dark:border-white/10"
+                    >
+                      Choose File
+                    </Button>
+                    <div className="flex items-center gap-2">
+                       {isCompressing ? (
+                         <span className="text-sm text-slate-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Compressing...</span>
+                       ) : receiptFile ? (
+                         <span className="text-sm text-emerald-600 font-medium break-all">Ready: {receiptFile.name} ({(receiptFile.size / 1024).toFixed(1)} KB)</span>
+                       ) : existingReceiptUrl ? (
+                         <a href={existingReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline">View Existing Receipt</a>
+                       ) : (
+                         <span className="text-sm text-slate-500">No file chosen.</span>
+                       )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             
-            <div className="pt-4 flex flex-col sm:flex-row sm:justify-end gap-3 border-t border-slate-100 dark:border-white/5">
-              <Button 
-                type="button" 
-                variant="outline" 
-                disabled={isSubmitting}
-                className="font-bold"
-                onClick={(e) => handleSubmit(e, true)}
-              >
-                {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save & Add Another
-              </Button>
+            <div className="pt-4 flex flex-col sm:flex-row sm:justify-end gap-3 border-t border-slate-100 dark:border-white/5 mt-6">
+              {!editingId && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  disabled={isSubmitting}
+                  className="font-bold"
+                  onClick={(e) => handleSubmit(e, true)}
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save & Add Another
+                </Button>
+              )}
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
                 className="bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-lg shadow-indigo-600/20"
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save Entry
+                {editingId ? 'Update Entry' : 'Save Entry'}
               </Button>
             </div>
           </form>
@@ -640,6 +910,7 @@ export const PettyCash = () => {
                         >
                           Expenditure {sortField === 'expenditure' && (sortDirection === 'asc' ? '↑' : '↓')}
                         </th>
+                        <th className="p-4 font-semibold text-right w-[60px]"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -655,13 +926,30 @@ export const PettyCash = () => {
                             )}
                           </td>
                           <td className="p-4 align-top">
-                            <p className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1">{e.bill_name}</p>
-                            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">{e.reason}</p>
-                            {e.project_name && (
-                              <span className="inline-flex mt-2 text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">
-                                {e.project_name}
-                              </span>
-                            )}
+                            <div className="flex flex-col gap-1.5">
+                              <p className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1">{e.bill_name}</p>
+                              {e.receipt_url && (
+                                <a 
+                                  href={e.receipt_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center gap-1.5 w-fit text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group"
+                                  title="View Receipt Document"
+                                >
+                                  <Paperclip className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                                  <span className="underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2 group-hover:decoration-indigo-300 dark:group-hover:decoration-indigo-700">Receipt Attachment</span>
+                                  <ExternalLink className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all text-indigo-500" />
+                                </a>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-2 line-clamp-2 leading-relaxed">{e.reason}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              {e.project_name && (
+                                <span className="inline-flex text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">
+                                  {e.project_name}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 align-top">
                             <span className="inline-flex text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-white/10">
@@ -682,10 +970,22 @@ export const PettyCash = () => {
                               </span>
                             ) : '-'}
                           </td>
+                          <td className="p-4 align-top text-right w-[60px]">
+                            {(isAdmin || e.raised_by_id === user?.id) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(e)}
+                                className="h-8 w-8 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-sm text-slate-500">
+                          <td colSpan={6} className="p-8 text-center text-sm text-slate-500">
                             {isLoading ? 'Loading records...' : 'No petty cash records found matching your filters.'}
                           </td>
                         </tr>

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
-import { TransactionComments } from './TransactionComments';
+import { PaymentStageHistory } from './PaymentStageHistory';
 
 interface Props {
   project: Project;
@@ -168,12 +168,7 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Amount Paid</p>
                   <div className="flex items-center gap-2">
-                    <Input 
-                      type="number"
-                      value={order.amount_paid}
-                      onChange={(e) => updateOrderAmountPaid(order.id, Number(e.target.value) || 0)}
-                      className="h-8 w-32 text-sm font-bold text-emerald-600 rounded-lg border-slate-200 dark:border-slate-800 dark:border-slate-800"
-                    />
+                    <p className="text-sm font-black text-emerald-600 dark:text-emerald-500">₹ {order.amount_paid.toLocaleString()}</p>
                     {order.amount_paid >= order.total_amount && order.total_amount > 0 && (
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     )}
@@ -181,10 +176,14 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
                 </div>
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-50">
-                <TransactionComments 
+              <div className="pt-4 mt-4 border-t border-slate-50 dark:border-white/5">
+                <PaymentStageHistory 
                   commentsJson={order.comments} 
                   onUpdate={(newCommentsJson) => updateOrderComments(order.id, newCommentsJson)} 
+                  onReceiptAdded={(amount, date) => {
+                    const newAmount = order.amount_paid + amount;
+                    updateOrderAmountPaid(order.id, newAmount);
+                  }}
                 />
               </div>
             </div>

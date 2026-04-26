@@ -29,7 +29,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   const { user, allUsers } = useUser();
   const [isUploading, setIsUploading] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<{name: string, url: string, isMicrosoft?: boolean, originalUrl?: string} | null>(null);
+  const [previewFile, setPreviewFile] = useState<{name: string, url: string, isMicrosoft?: boolean, originalUrl?: string, originalFileObj?: any} | null>(null);
 
   const getPreviewUrl = (url: string) => {
     if (url.includes('sharepoint.com') || url.includes('onedrive.live.com')) {
@@ -68,15 +68,50 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
         const blob = await client.api(`/shares/${encodedUrl}/driveItem/content`).responseType('blob').get();
         const blobUrl = URL.createObjectURL(blob);
         
-        setPreviewFile({ name: file.name, url: blobUrl, isMicrosoft: true, originalUrl: file.url });
+        setPreviewFile({ name: file.name, url: blobUrl, isMicrosoft: true, originalUrl: file.url, originalFileObj: file });
       } catch (graphError) {
         console.error("Failed to fetch graph blob, falling back to viewer", graphError);
-        setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: true, originalUrl: file.url });
+        setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: true, originalUrl: file.url, originalFileObj: file });
       } finally {
         setIsPreviewLoading(null);
       }
     } else {
-      setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: false, originalUrl: file.url });
+      setPreviewFile({ name: file.name, url: getPreviewUrl(file.url), isMicrosoft: false, originalUrl: file.url, originalFileObj: file });
+    }
+  };
+
+  const handleNativeDownload = async (file: any) => {
+    setIsPreviewLoading(file.id);
+    try {
+      if (file.url.includes('sharepoint.com') || file.url.includes('onedrive.live.com')) {
+        const client = await getGraphClient();
+        const base64 = btoa(file.url);
+        const encodedUrl = 'u!' + base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        
+        const blob = await client.api(`/shares/${encodedUrl}/driveItem/content`).responseType('blob').get();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+      } else {
+        const a = document.createElement('a');
+        a.href = file.url;
+        a.download = file.name;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error("Failed to download file natively:", error);
+      toast.error("You do not have permission to download this file securely. Please contact an Administrator.");
+    } finally {
+      setIsPreviewLoading(null);
     }
   };
 
@@ -124,12 +159,55 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
     setTimeout(() => clearInterval(pollInterval), 180000);
   };
 
+  const convertToWebP = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/') || file.type === 'image/webp') {
+        resolve(file);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file); // fallback
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+              const webpFile = new File([blob], newName, { type: 'image/webp' });
+              resolve(webpFile);
+            } else {
+              resolve(file); // fallback
+            }
+          }, 'image/webp', 0.85); // 85% quality
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const originalFile = event.target.files?.[0];
+    if (!originalFile) return;
 
     setIsUploading(true);
     try {
+      let file = originalFile;
+      if (file.type.startsWith('image/') && file.type !== 'image/webp') {
+        file = await convertToWebP(file);
+      }
+
       const client = await getGraphClient();
       const folderName = projectName.replace(/[^a-zA-Z0-9 -]/g, '').trim();
       const folderPath = `PurvaVedic_Projects/${folderName}`;
@@ -333,14 +411,9 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                       <div className="flex items-center justify-end gap-2">
                         {(() => {
                             const ext = file.name.split('.').pop()?.toLowerCase();
-                            const isDrawing = ext === 'dwg' || ext === 'stl' || ext === 'rvt';
-                            const hasAccess = !isDrawing || canDownloadDrawings(user?.role);
+                            const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
+                            const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
                             
-                            if (!hasAccess) {
-                                return (
-                                    <span className="text-xs text-slate-400 dark:text-zinc-500 italic mr-2">Secure File</span>
-                                );
-                            }
                             return (
                                 <>
                                     <Button 
@@ -357,21 +430,24 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                                       )}
                                       View
                                     </Button>
-                                    <Button 
-                                      variant="default" 
-                                      size="sm" 
-                                      className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
-                                      onClick={() => {
-                                        let downloadUrl = file.url;
-                                        if (downloadUrl.includes('sharepoint.com') || downloadUrl.includes('onedrive.live.com')) {
-                                          downloadUrl = downloadUrl + (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
-                                        }
-                                        window.open(downloadUrl, '_blank');
-                                      }}
-                                    >
-                                      <Download className="w-3 h-3 mr-1" />
-                                      Download
-                                    </Button>
+                                    
+                                    {hasAccess ? (
+                                      <Button 
+                                        variant="default" 
+                                        size="sm" 
+                                        className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700"
+                                        onClick={() => handleNativeDownload(file)}
+                                      >
+                                        {isPreviewLoading === file.id ? (
+                                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <Download className="w-3 h-3 mr-1" />
+                                        )}
+                                        Download
+                                      </Button>
+                                    ) : (
+                                      <span className="text-xs text-slate-400 dark:text-zinc-500 italic ml-2">Secure File</span>
+                                    )}
                                 </>
                             );
                         })()}
@@ -405,20 +481,27 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
           <div className="flex-1 w-full flex flex-col bg-[#0a0a0a] relative items-center justify-center">
             {previewFile && (
               <>
-                <div className="absolute top-4 right-6 z-10">
-                  <Button 
-                    variant="outline" 
-                    className="bg-black/50 hover:bg-black/80 text-white border-white/20 backdrop-blur-md"
-                    onClick={() => {
-                      let url = previewFile.originalUrl || previewFile.url;
-                      if (url.includes('action=embedview')) {
-                         url = url.replace(/&action=embedview|\?action=embedview/, '');
-                      }
-                      window.open(url, '_blank');
-                    }}
-                  >
-                    Open in New Tab
-                  </Button>
+                <div className="absolute top-4 right-6 z-10 flex gap-2">
+                  {(() => {
+                    if (!previewFile.originalFileObj) return null;
+                    const file = previewFile.originalFileObj;
+                    const ext = file.name.split('.').pop()?.toLowerCase();
+                    const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
+                    const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
+                    
+                    if (!hasAccess) return <span className="bg-black/50 text-white backdrop-blur-md px-3 py-1.5 rounded-md text-sm font-bold border border-white/20">Secure File (View Only)</span>;
+                    
+                    return (
+                      <Button 
+                        variant="outline" 
+                        className="bg-black/50 hover:bg-black/80 text-white border-white/20 backdrop-blur-md"
+                        onClick={() => handleNativeDownload(previewFile)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Secure Download
+                      </Button>
+                    );
+                  })()}
                 </div>
 
                 {/* If it's a Microsoft file but we failed to fetch the blob, it will be caught here and show the secure message */}
@@ -429,21 +512,26 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Secure Microsoft Document</h3>
                     <p className="text-slate-400 max-w-md mb-8 text-sm leading-relaxed">
-                      This file is securely hosted in your organization's Microsoft 365 environment. Microsoft's security policies prevent authenticated documents from being embedded inside third-party apps.
+                      This file is securely hosted in your organization's Microsoft 365 environment. Microsoft's security policies prevent authenticated documents from being embedded.
                     </p>
-                    <Button 
-                      size="lg"
-                      className="bg-[#0078D4] hover:bg-[#006CBF] text-white rounded-xl shadow-lg shadow-[#0078D4]/20"
-                      onClick={() => {
-                        let url = previewFile.originalUrl || previewFile.url;
-                        if (url.includes('action=embedview')) {
-                           url = url.replace(/&action=embedview|\?action=embedview/, '');
-                        }
-                        window.open(url, '_blank');
-                      }}
-                    >
-                      Open in SharePoint / OneDrive
-                    </Button>
+                    {(() => {
+                      if (!previewFile.originalFileObj) return null;
+                      const file = previewFile.originalFileObj;
+                      const ext = file.name.split('.').pop()?.toLowerCase();
+                      const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
+                      const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
+                      
+                      if (!hasAccess) return <span className="text-slate-400 font-bold border border-slate-700 px-4 py-2 rounded-xl">View Only (Download Protected)</span>;
+                      return (
+                        <Button 
+                          size="lg"
+                          className="bg-[#0078D4] hover:bg-[#006CBF] text-white rounded-xl shadow-lg shadow-[#0078D4]/20"
+                          onClick={() => handleNativeDownload(previewFile)}
+                        >
+                          <Download className="w-4 h-4 mr-2" /> Download Directly
+                        </Button>
+                      );
+                    })()}
                   </div>
                 ) : previewFile.name.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) ? (
                   <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain p-4" />

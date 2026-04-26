@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Task } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { cn } from '../lib/utils';
-import { Calendar, User, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Calendar, User, CheckCircle2, Circle, Clock, MessageSquare, Paperclip } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
@@ -73,11 +73,11 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onClick }) =>
         </p>
       )}
       
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 mt-3">
         {task.assigned_to && (
           <div className="flex items-center gap-1.5">
-            <Avatar className="w-5 h-5 border-2 border-white shadow-sm">
-              <AvatarFallback className="bg-indigo-100 text-indigo-600 font-bold text-[8px]">
+            <Avatar className="w-5 h-5 border-2 border-white dark:border-[#121212] shadow-sm">
+              <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold text-[8px]">
                 {task.assigned_to.charAt(0)}
               </AvatarFallback>
             </Avatar>
@@ -86,8 +86,26 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onClick }) =>
             </span>
           </div>
         )}
+        
+        {(task.comment || task.attachment_url) && (
+          <div className="flex items-center gap-2.5 text-slate-400 ml-auto mr-1">
+            {task.comment && (
+              <div className="flex items-center gap-1" title="Has comment">
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold">1</span>
+              </div>
+            )}
+            {task.attachment_url && (
+              <div className="flex items-center gap-1" title="Has attachment">
+                <Paperclip className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold">1</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {task.deadline && (
-          <div className="flex items-center gap-1.5 ml-auto">
+          <div className={cn("flex items-center gap-1.5", (task.comment || task.attachment_url) ? "" : "ml-auto")}>
             <Calendar className="w-3 h-3 text-slate-400" />
             <span className={cn(
               "text-[10px] font-bold uppercase tracking-widest",

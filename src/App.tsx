@@ -41,7 +41,7 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FFFFF0] dark:bg-slate-950 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
@@ -64,7 +64,7 @@ function MainApp() {
     }
     
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-[#FFFFF0] dark:bg-slate-950 flex flex-col items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin mb-4" />
         <p className="text-slate-500 font-medium">Completing Microsoft authentication...</p>
         <p className="text-slate-400 text-sm mt-2">This window should close automatically.</p>

@@ -1,6 +1,5 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
+import { ChevronLeft, ChevronRight, LayoutDashboard, 
   Trello, 
   Calendar as CalendarIcon, 
   LogOut, 
@@ -61,13 +60,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const { language, setLanguage, t, translateData } = useLanguage();
   const [showHistory, setShowHistory] = React.useState(false);
   const [showAppearance, setShowAppearance] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   React.useEffect(() => {
-    if (isLimitedUser(user?.role) && activeTab === 'dashboard') {
-      setActiveTab('my-projects');
-    }
-    if (user?.role === 'deputy_sthapathy' && activeTab === 'dashboard') {
-      setActiveTab('projects');
+    if (!user) return;
+    const role = user.role;
+    if (activeTab === 'dashboard' && !hasAdminAccess(role) && role !== 'finance_manager') {
+      setActiveTab('kanban');
     }
   }, [user?.role, activeTab, setActiveTab]);
 
@@ -88,8 +87,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     
     if (role === 'deputy_sthapathy') {
       return [
-        { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'kanban', label: t('kanban'), icon: Trello },
+        { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
         { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
@@ -106,8 +105,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     }
     
     return [
-      { id: 'my-projects', label: t('my_projects'), icon: ListTodo },
       { id: 'kanban', label: t('kanban'), icon: Trello },
+      { id: 'projects', label: t('projects'), icon: ListTodo },
       { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
       { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
     ];
@@ -147,42 +146,46 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     </DropdownMenuContent>
   );
 
-  const SidebarContent = () => {
+  const SidebarContent = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
     const { getDashboardColors, workspaceName, workspaceLogo } = useTheme();
     const themeColors = getDashboardColors();
     
     return (
-      <div className="flex flex-col h-full">
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800">
-          <div className="flex items-center gap-3">
+      <div className="flex flex-col h-full relative">
+        <div className={cn("border-b border-slate-100 dark:border-slate-800 dark:border-slate-800 flex flex-col justify-center", isCollapsed ? "p-4 items-center h-[88px]" : "p-6 h-[88px]")}>
+          <div className="flex items-center gap-3 w-full">
             {workspaceLogo ? (
-              <img src={workspaceLogo} alt="Logo" className="h-8 max-w-[120px] object-contain object-left" />
+              <img src={workspaceLogo} alt="Logo" className={cn("object-contain object-left", isCollapsed ? "h-8 w-8 mx-auto" : "h-8 max-w-[120px]")} />
             ) : (
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white", themeColors.solid)}>
+              <div className={cn("rounded-lg flex items-center justify-center shrink-0 text-white", themeColors.solid, isCollapsed ? "w-10 h-10 mx-auto" : "w-8 h-8")}>
                 {workspaceName.charAt(0)}
               </div>
             )}
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 line-clamp-2 leading-tight flex-1">
-              {workspaceName}
-            </h1>
+            {!isCollapsed && (
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 line-clamp-2 leading-tight flex-1">
+                {workspaceName}
+              </h1>
+            )}
           </div>
-          <p className="text-xs text-slate-500 mt-1.5 font-medium uppercase tracking-wider">{t('project_management')}</p>
+          {!isCollapsed && <p className="text-xs text-slate-500 mt-1.5 font-medium uppercase tracking-wider">{t('project_management')}</p>}
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className={cn("flex-1 space-y-1", isCollapsed ? "p-3" : "p-4")}>
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
+              title={isCollapsed ? item.label : undefined}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                "flex items-center transition-all duration-200",
+                isCollapsed ? "w-12 h-12 justify-center rounded-2xl mx-auto" : "w-full gap-3 px-4 py-3 rounded-xl",
                 activeTab === item.id 
                   ? cn(themeColors.bg, themeColors.text, "shadow-sm border dark:border-white/5")
                   : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 dark:border-transparent hover:text-slate-900 dark:hover:text-slate-100 border border-transparent"
               )}
             >
-              <item.icon className={cn("w-5 h-5", activeTab === item.id ? themeColors.text : "text-slate-400")} />
-              {item.label}
+              <item.icon className={cn("shrink-0", activeTab === item.id ? themeColors.text : "text-slate-400", isCollapsed ? "w-6 h-6" : "w-5 h-5")} />
+              {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
             </button>
           ))}
         </nav>
@@ -191,10 +194,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
+    <div className="flex h-screen bg-[#FFFFF0] dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 border-r border-slate-200 dark:border-slate-800 flex-col shrink-0">
-        <SidebarContent />
+      <aside className={cn("hidden lg:flex bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 border-r border-slate-200 dark:border-slate-800 flex-col shrink-0 transition-all duration-300 relative", isSidebarCollapsed ? "w-20" : "w-64")}>
+        <SidebarContent isCollapsed={isSidebarCollapsed} />
+        
+        {/* Collapse Toggle Button */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-8 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full flex items-center justify-center shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors z-50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+        </button>
       </aside>
 
       {/* Main Content */}
