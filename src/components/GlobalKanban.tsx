@@ -99,7 +99,7 @@ export const GlobalKanban: React.FC<{ onProjectClick: (p: Project) => void }> = 
     setLoading(true);
     try {
       // Fetch Projects
-      let projectsQuery = supabase.from('projects').select('*');
+      let projectsQuery = supabase.from('projects').select('id, name');
       const { data: projectsData, error: projectsError } = await projectsQuery;
       if (projectsError) throw projectsError;
       setProjects(projectsData || []);

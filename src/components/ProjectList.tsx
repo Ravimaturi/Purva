@@ -382,7 +382,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ employeeView, onProjec
                       <DropdownMenuContent align="start" className="rounded-xl dark:bg-[#121212] dark:border-white/10">
                         {uniqueAssignees.map(assignee => (
                           <DropdownMenuItem key={assignee} onClick={() => setAssignedFilter(assignee)} className="dark:text-zinc-300 dark:hover:bg-[#181818] dark:hover:text-zinc-100">
-                            <span className={cn(assignedFilter === assignee && "font-bold text-indigo-600 dark:text-indigo-400")}>{assignee}</span>
+                            <span className={cn(assignedFilter === assignee && "font-bold text-indigo-600 dark:text-indigo-400")}>{assignee === 'All' ? t('all') : translateData(assignee)}</span>
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>

@@ -13,7 +13,8 @@ import { ChevronLeft, ChevronRight, LayoutDashboard,
   MoreVertical,
   Building2,
   Languages,
-  Monitor
+  Monitor,
+  ShieldCheck
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -81,7 +82,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
         { id: 'team', label: t('team'), icon: UsersIcon },
-        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
+        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee },
+        { id: 'file_controls', label: t('controls_portal'), icon: ShieldCheck }
       ];
     }
     
@@ -91,7 +93,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
-        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
+        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee }
       ];
     }
     
@@ -100,7 +102,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
         { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
-        { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
+        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee }
       ];
     }
     
@@ -108,31 +110,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       { id: 'kanban', label: t('kanban'), icon: Trello },
       { id: 'projects', label: t('projects'), icon: ListTodo },
       { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
-      { id: 'petty_cash', label: 'Petty Cash', icon: IndianRupee }
+      { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee }
     ];
   };
 
   const navItems = getNavItems();
 
-  const UserMenuContent = () => (
+  const renderUserMenuContent = () => (
     <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-lg border-slate-200 dark:border-white/10 dark:border-slate-800 p-2">
       <div className="px-2 py-2 mb-1">
         <p className="text-sm font-bold text-slate-900 dark:text-zinc-100 dark:text-slate-100">{user?.full_name}</p>
         <div className="flex flex-col mt-1">
           <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{translateData(user?.designation || 'N/A')}</p>
-          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{user?.role ? RoleLabels[user.role] || user.role : ''}</p>
+          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{user?.role ? translateData(RoleLabels[user.role] || user.role) : ''}</p>
         </div>
       </div>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={() => setActiveTab('profile')}>
         <User className="mr-2 h-4 w-4" />
-        <span>My Profile</span>
+        <span>{t('my_profile')}</span>
       </DropdownMenuItem>
       {hasAdminAccess(user?.role) && (
-        <DropdownMenuItem onClick={() => setActiveTab('team')}>
-          <UsersIcon className="mr-2 h-4 w-4" />
-          <span>{t('team')}</span>
-        </DropdownMenuItem>
+        <>
+          <DropdownMenuItem onClick={() => setActiveTab('team')}>
+            <UsersIcon className="mr-2 h-4 w-4" />
+            <span>{t('team')}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setActiveTab('file_controls')}>
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            <span>{t('file_access_config')}</span>
+          </DropdownMenuItem>
+        </>
       )}
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-red-600" onClick={async () => {
@@ -146,7 +154,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     </DropdownMenuContent>
   );
 
-  const SidebarContent = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
+  const renderSidebarContent = (isCollapsed: boolean = false) => {
     const { getDashboardColors, workspaceName, workspaceLogo } = useTheme();
     const themeColors = getDashboardColors();
     
@@ -197,7 +205,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     <div className="flex h-screen bg-[#FFFFF0] dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
       {/* Desktop Sidebar */}
       <aside className={cn("hidden lg:flex bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 border-r border-slate-200 dark:border-slate-800 flex-col shrink-0 transition-all duration-300 relative", isSidebarCollapsed ? "w-20" : "w-64")}>
-        <SidebarContent isCollapsed={isSidebarCollapsed} />
+        {renderSidebarContent(isSidebarCollapsed)}
         
         {/* Collapse Toggle Button */}
         <button
@@ -223,7 +231,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 }
               />
               <SheetContent side="left" className="p-0 w-72">
-                <SidebarContent />
+                {renderSidebarContent(false)}
               </SheetContent>
             </Sheet>
             
@@ -346,12 +354,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                       </Avatar>
                       <div className="hidden md:flex flex-col items-start text-left">
                         <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none">{user?.full_name}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role ? RoleLabels[user.role] || user.role : ''}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user?.role ? translateData(RoleLabels[user.role] || user.role) : ''}</p>
                       </div>
                     </Button>
                   }
                 />
-                <UserMenuContent />
+                {renderUserMenuContent()}
               </DropdownMenu>
             </div>
             
@@ -367,7 +375,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                     </Button>
                   }
                 />
-                <UserMenuContent />
+                {renderUserMenuContent()}
               </DropdownMenu>
             </div>
           </div>

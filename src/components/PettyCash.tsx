@@ -4,6 +4,7 @@ import { loginRequest } from '../lib/msalConfig';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
 import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink } from 'lucide-react';
@@ -41,8 +42,10 @@ interface PettyCashEntry {
 }
 
 export const PettyCash = () => {
-  const { user } = useUser();
-  const isAdmin = hasAdminAccess(user?.role);
+  const { user, allUsers } = useUser();
+  const { canManagePettyCash } = useFileSettings();
+  const isAdmin = canManagePettyCash(user?.role, 'edit') || hasAdminAccess(user?.role);
+  const canCreate = canManagePettyCash(user?.role, 'create');
   const { instance, accounts } = useMsal();
   
   const getGraphClient = useCallback(async () => {
@@ -78,9 +81,13 @@ export const PettyCash = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Filters
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterUser, setFilterUser] = useState<string>('All');
-  const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: firstDayOfMonth, end: lastDayOfMonth });
 
   // Form State
   const defaultDate = new Date().toISOString().split('T')[0];
@@ -91,7 +98,8 @@ export const PettyCash = () => {
     bill_name: '',
     reason: '',
     advance_amount: '',
-    expenditure_amount: ''
+    expenditure_amount: '',
+    raised_by_id: ''
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -105,7 +113,7 @@ export const PettyCash = () => {
 
   useEffect(() => {
     fetchQueries();
-  }, []);
+  }, [dateRange.start, dateRange.end]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,11 +168,20 @@ export const PettyCash = () => {
       const { data: projData } = await supabase.from('projects').select('id, name');
       if (projData) setProjects(projData);
 
-      // Fetch Petty Cash entries - with 10k row limit
+      // Fetch Petty Cash entries
       let query = supabase.from('petty_cash')
         .select('*')
-        .limit(20000) 
         .order('date', { ascending: false });
+        
+      if (dateRange.start) {
+        query = query.gte('date', dateRange.start);
+      }
+      if (dateRange.end) {
+        query = query.lte('date', dateRange.end);
+      }
+      
+      // Limit slightly just in case the date range selected is massive
+      query = query.limit(3000);
       
       // If not admin, restrict to own entries
       if (!isAdmin && user?.id) {
@@ -194,7 +211,8 @@ export const PettyCash = () => {
       bill_name: entry.bill_name,
       reason: entry.reason,
       advance_amount: entry.advance_amount ? entry.advance_amount.toString() : '',
-      expenditure_amount: entry.expenditure_amount ? entry.expenditure_amount.toString() : ''
+      expenditure_amount: entry.expenditure_amount ? entry.expenditure_amount.toString() : '',
+      raised_by_id: entry.raised_by_id || ''
     });
     setExistingReceiptUrl(entry.receipt_url || null);
     setReceiptFile(null);
@@ -281,6 +299,14 @@ export const PettyCash = () => {
           advance_amount: adv,
           expenditure_amount: exp
         };
+        
+        if (isAdmin && form.raised_by_id && form.raised_by_id !== '') {
+          const selectedUser = allUsers?.find(u => u.id === form.raised_by_id);
+          if (selectedUser) {
+            updatePayload.raised_by_id = selectedUser.id;
+            updatePayload.raised_by_name = selectedUser.full_name;
+          }
+        }
         
         if (finalReceiptUrl) updatePayload.receipt_url = finalReceiptUrl;
 
@@ -463,18 +489,20 @@ export const PettyCash = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Petty Cash Tracking</h1>
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
-        <Button onClick={() => {
-          if (showForm) {
-            setShowForm(false);
-            setEditingId(null);
-            setForm(emptyForm);
-          } else {
-            setShowForm(true);
-          }
-        }} className="mt-4 sm:mt-0 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
-          <Plus className="w-4 h-4 mr-2" />
-          {showForm ? 'View Dashboard' : 'New Entry'}
-        </Button>
+        {(canCreate || showForm) && (
+          <Button onClick={() => {
+            if (showForm) {
+              setShowForm(false);
+              setEditingId(null);
+              setForm(emptyForm);
+            } else {
+              setShowForm(true);
+            }
+          }} className="mt-4 sm:mt-0 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
+            {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            {showForm ? 'Cancel Form' : 'New Entry'}
+          </Button>
+        )}
       </div>
 
       {showForm ? (
@@ -509,6 +537,21 @@ export const PettyCash = () => {
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+
+              {isAdmin && editingId && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Reassign To (Admin Only)</label>
+                  <select 
+                    name="raised_by_id"
+                    value={form.raised_by_id || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white h-10"
+                  >
+                    <option value="" disabled>Select User</option>
+                    {allUsers?.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Project Name</label>

@@ -254,7 +254,7 @@ export const TeamManagement: React.FC = () => {
                     <DropdownMenuContent align="start" className="rounded-xl">
                       {uniqueDesignations.map(d => (
                         <DropdownMenuItem key={d} onClick={() => setDesignationFilter(d)}>
-                          {d === 'All' ? 'All' : translateData(d)}
+                          {d === 'All' ? t('all') : translateData(d)}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -281,7 +281,7 @@ export const TeamManagement: React.FC = () => {
                     <DropdownMenuContent align="start" className="rounded-xl">
                       {uniqueRoles.map(r => (
                         <DropdownMenuItem key={r} onClick={() => setRoleFilter(r as UserRole | 'All')}>
-                          {r === 'All' ? 'All' : RoleLabels[r as UserRole] || r}
+                          {r === 'All' ? t('all') : translateData(RoleLabels[r as UserRole] || r)}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>

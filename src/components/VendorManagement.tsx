@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Vendor, VendorOrder, Project, hasFinanceAccess, hasProjectManagementAccess } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useFileSettings } from '../contexts/FileSettingsContext';
 import { useUser } from '../contexts/UserContext';
 import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -20,6 +21,7 @@ interface VendorManagementProps {
 export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectClick }) => {
   const { t } = useLanguage();
   const { user } = useUser();
+  const { canManageVendors } = useFileSettings();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [orders, setOrders] = useState<VendorOrder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,7 +29,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
   useEffect(() => {
     const fetchData = async () => {
       const [projectsRes, vendorsRes, ordersRes] = await Promise.all([
-        supabase.from('projects').select('*'),
+        supabase.from('projects').select('id, name, status'),
         supabase.from('vendors').select('*').order('created_at', { ascending: false }),
         supabase.from('vendor_orders').select('*')
       ]);
@@ -169,7 +171,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
+          {canManageVendors(user?.role, 'create') && (
             <Button 
               onClick={() => setIsAddVendorOpen(true)}
               className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-sm dark:shadow-none h-11 px-6 font-bold"
@@ -199,8 +201,8 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                     <p className="text-xs font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">{vendor.services_list}</p>
                   </div>
                 </div>
-                {(hasFinanceAccess(user?.role) || hasProjectManagementAccess(user?.role)) && (
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
+                  {canManageVendors(user?.role, 'edit') && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -209,6 +211,8 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
+                  )}
+                  {canManageVendors(user?.role, 'delete') && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -217,8 +221,8 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="space-y-3 mb-6">

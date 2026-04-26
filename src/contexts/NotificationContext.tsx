@@ -26,7 +26,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchNotifications();
       checkDeadlines();
       
@@ -47,7 +47,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user?.id, user?.full_name]);
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -68,7 +68,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Fetch tasks assigned to this user that are not completed and have a deadline
     const { data: tasks, error } = await supabase
       .from('tasks')
-      .select('*')
+      .select('id, title, deadline')
       .eq('assigned_to', user.full_name)
       .neq('status', 'Completed')
       .not('deadline', 'is', null);

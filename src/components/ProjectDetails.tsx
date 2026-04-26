@@ -836,7 +836,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-sm sm:text-xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight truncate">{translateData(project.name)}</h2>
                   <Badge variant="outline" className={cn("font-black uppercase text-[7px] sm:text-[9px] px-1.5 sm:px-2 py-0 shrink-0 tracking-tighter", themeColors.bg, themeColors.text, themeColors.border)}>
-                    {t(project.status.toLowerCase().replace(/ /g, '_'))}
+                    {translateData(STAGE_LABELS[project.status] || project.status)}
                   </Badge>
                 </div>
                 <p className="text-[9px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest truncate">Client: <span className="text-slate-900 dark:text-zinc-300">{translateData(project.client_name)}</span></p>
@@ -1044,7 +1044,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     "text-[8px] font-black uppercase tracking-tighter",
                                     item.status === 'Completed' ? "bg-emerald-500" : "bg-slate-100"
                                   )}>
-                                    {t(item.status.toLowerCase())}
+                                    {translateData(item.status)}
                                   </Badge>
                                 )}
                               </div>
@@ -1601,7 +1601,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     </div>
                     <div className="flex-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                        {STAGE_LABELS[project.status] === 'Handover' ? 'Completed On' : t('target_date')}
+                        {STAGE_LABELS[project.status] === 'Handover' ? t('completed_on') : t('target_date')}
                       </p>
                       {isEditing ? (
                         <Input 

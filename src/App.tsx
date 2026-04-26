@@ -13,6 +13,7 @@ import { VendorManagement } from './components/VendorManagement';
 import { PettyCash } from './components/PettyCash';
 import { Login } from './components/Login';
 import { UpdatePassword } from './components/UpdatePassword';
+import { FileControls } from './components/FileControls';
 import { Toaster } from './components/ui/sonner';
 import { Sheet, SheetContent } from './components/ui/sheet';
 import { ProjectDetails } from './components/ProjectDetails';
@@ -111,6 +112,8 @@ function MainApp() {
         return <VendorManagement onProjectClick={handleProjectClick} />;
       case 'petty_cash':
         return <PettyCash />;
+      case 'file_controls':
+        return <FileControls />;
       case 'profile':
         return <Profile />;
       default:
@@ -154,6 +157,7 @@ function MainApp() {
 }
 
 import { ThemeProvider } from './contexts/ThemeContext';
+import { FileSettingsProvider } from './contexts/FileSettingsContext';
 
 export default function App() {
   return (
@@ -161,8 +165,10 @@ export default function App() {
       <LanguageProvider>
         <UserProvider>
           <NotificationProvider>
-            <MainApp />
-            <Toaster position="top-right" />
+            <FileSettingsProvider>
+              <MainApp />
+              <Toaster position="top-right" />
+            </FileSettingsProvider>
           </NotificationProvider>
         </UserProvider>
       </LanguageProvider>

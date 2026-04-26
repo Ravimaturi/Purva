@@ -32,13 +32,13 @@ export const GlobalCalendar: React.FC<{ onProjectClick: (p: Project) => void }> 
     setLoading(true);
     try {
       // Fetch Projects (for deadlines and mapping - everyone needs all projects to resolve names)
-      let projectsQuery = supabase.from('projects').select('*');
+      let projectsQuery = supabase.from('projects').select('id, name, deadline, status');
       const { data: projectsData, error: projectsError } = await projectsQuery;
       if (projectsError) throw projectsError;
       setProjects(projectsData || []);
 
       // Fetch Tasks
-      let tasksQuery = supabase.from('tasks').select('*, projects(name)');
+      let tasksQuery = supabase.from('tasks').select('id, title, deadline, status, project_id, projects(name)');
       const canViewAll = hasAdminAccess(user?.role) || user?.role === 'deputy_sthapathy' || user?.role === 'finance_manager';
       if (!canViewAll) {
         tasksQuery = tasksQuery.eq('assigned_to', user?.full_name);

@@ -8,6 +8,7 @@ import { FileIcon, Download, Upload, Loader2, FolderOpen, Image as ImageIcon, Fi
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { useFileSettings } from '../contexts/FileSettingsContext';
 import { canDownloadDrawings } from '../types';
 import { uploadToAutodeskCloud } from '../lib/autodesk';
 
@@ -27,6 +28,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   const { instance, accounts, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const { user, allUsers } = useUser();
+  const { canViewFile, canDownloadFile } = useFileSettings();
   const [isUploading, setIsUploading] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{name: string, url: string, isMicrosoft?: boolean, originalUrl?: string, originalFileObj?: any} | null>(null);
@@ -410,28 +412,29 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {(() => {
-                            const ext = file.name.split('.').pop()?.toLowerCase();
-                            const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
-                            const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
+                            const canView = canViewFile(user?.role, file.name, file.uploaded_by, user?.id);
+                            const canDownload = canDownloadFile(user?.role, file.name, file.uploaded_by, user?.id);
                             
                             return (
                                 <>
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      disabled={isPreviewLoading === file.id}
-                                      className="h-8 text-xs font-bold"
-                                      onClick={() => handleViewFile(file)}
-                                    >
-                                      {isPreviewLoading === file.id ? (
-                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                      ) : (
-                                        <Eye className="w-3 h-3 mr-1" />
-                                      )}
-                                      View
-                                    </Button>
+                                    {canView && (
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        disabled={isPreviewLoading === file.id}
+                                        className="h-8 text-xs font-bold"
+                                        onClick={() => handleViewFile(file)}
+                                      >
+                                        {isPreviewLoading === file.id ? (
+                                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <Eye className="w-3 h-3 mr-1" />
+                                        )}
+                                        View
+                                      </Button>
+                                    )}
                                     
-                                    {hasAccess ? (
+                                    {canDownload ? (
                                       <Button 
                                         variant="default" 
                                         size="sm" 
@@ -485,11 +488,9 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                   {(() => {
                     if (!previewFile.originalFileObj) return null;
                     const file = previewFile.originalFileObj;
-                    const ext = file.name.split('.').pop()?.toLowerCase();
-                    const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
-                    const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
+                    const canDownload = canDownloadFile(user?.role, file.name, file.uploaded_by, user?.id);
                     
-                    if (!hasAccess) return <span className="bg-black/50 text-white backdrop-blur-md px-3 py-1.5 rounded-md text-sm font-bold border border-white/20">Secure File (View Only)</span>;
+                    if (!canDownload) return <span className="bg-black/50 text-white backdrop-blur-md px-3 py-1.5 rounded-md text-sm font-bold border border-white/20">Secure File (View Only)</span>;
                     
                     return (
                       <Button 
@@ -517,11 +518,9 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
                     {(() => {
                       if (!previewFile.originalFileObj) return null;
                       const file = previewFile.originalFileObj;
-                      const ext = file.name.split('.').pop()?.toLowerCase();
-                      const isProtected = ['dwg', 'stl', 'rvt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
-                      const hasAccess = !isProtected || canDownloadDrawings(user?.role) || file.uploaded_by === user?.id;
+                      const canDownload = canDownloadFile(user?.role, file.name, file.uploaded_by, user?.id);
                       
-                      if (!hasAccess) return <span className="text-slate-400 font-bold border border-slate-700 px-4 py-2 rounded-xl">View Only (Download Protected)</span>;
+                      if (!canDownload) return <span className="text-slate-400 font-bold border border-slate-700 px-4 py-2 rounded-xl">View Only (Download Protected)</span>;
                       return (
                         <Button 
                           size="lg"

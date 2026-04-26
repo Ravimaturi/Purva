@@ -51,9 +51,9 @@ export const Dashboard: React.FC = () => {
   const fetchProjects = async () => {
     try {
       const [projectsRes, paymentsRes, vendorsRes, checklistsRes] = await Promise.all([
-        supabase.from('projects').select('*'),
-        supabase.from('payment_stages').select('*'),
-        supabase.from('vendor_orders').select('*'),
+        supabase.from('projects').select('id, name, client_name, status, progress, deadline, assigned_to, last_updated, logo_url'),
+        supabase.from('payment_stages').select('id, amount, amount_received, project_id'),
+        supabase.from('vendor_orders').select('id, total_amount, amount_paid, status, project_id'),
         supabase.from('project_checklists').select('project_id, is_completed, stage, category, task_name, order_index')
       ]);
       
@@ -336,15 +336,18 @@ export const Dashboard: React.FC = () => {
 
   const stats = [
     { label: t('all_projects'), value: projects.length, icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-    { label: t('discussion'), value: projects.filter(p => p.status === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
-    { label: t('design_and_prep'), value: projects.filter(p => p.status === 'Advance Received').length, icon: Clock, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
-    { label: t('in_progress'), value: projects.filter(p => p.status === 'Construction').length, icon: HardHat, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
-    { label: t('on_hold'), value: projects.filter(p => p.status === 'Work is on hold').length, icon: AlertCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-500/10' },
-    { label: t('handover'), value: projects.filter(p => p.status === 'Completed').length, icon: CheckCircle2, color: 'text-slate-600 dark:text-zinc-400', bg: 'bg-slate-100 dark:bg-white/5' },
+    { label: t('discussion'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Discussion').length, icon: MessageSquare, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { label: t('design_and_prep'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Design & Prep').length, icon: Clock, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { label: t('in_progress'), value: projects.filter(p => STAGE_LABELS[p.status] === 'In Progress').length, icon: HardHat, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { label: t('on_hold'), value: projects.filter(p => STAGE_LABELS[p.status] === 'On Hold').length, icon: AlertCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-500/10' },
+    { label: t('handover'), value: projects.filter(p => STAGE_LABELS[p.status] === 'Handover').length, icon: CheckCircle2, color: 'text-slate-600 dark:text-zinc-400', bg: 'bg-slate-100 dark:bg-white/5' },
   ];
 
   const filteredProjects = filterStatus 
-    ? projects.filter(p => STAGE_LABELS[p.status] === filterStatus || t(p.status.toLowerCase().replace(/ /g, '_')) === filterStatus)
+    ? projects.filter(p => {
+        const stageLabel = STAGE_LABELS[p.status] || p.status;
+        return stageLabel === filterStatus || translateData(stageLabel) === filterStatus;
+      })
     : projects;
 
   return (
@@ -418,7 +421,7 @@ export const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-indigo-600" />
-            {filterStatus ? `${filterStatus} ${t('projects')}` : t('active_projects')}
+            {filterStatus ? `${filterStatus} ${t('projects')}` : t('all_projects')}
           </h2>
           <div className="flex items-center gap-3">
             <Button 
@@ -545,7 +548,7 @@ export const Dashboard: React.FC = () => {
                       )}
                       <div className="min-w-0">
                         <p className={cn("text-base font-bold text-slate-900 dark:text-zinc-100 transition-colors truncate", `group-hover:${colorTheme.text}`)}>{translateData(project.name)}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{t(project.status.toLowerCase().replace(/ /g, '_'))}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{translateData(STAGE_LABELS[project.status] || project.status)}</p>
                       </div>
                     </div>
                   </div>
