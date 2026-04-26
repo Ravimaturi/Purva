@@ -14,7 +14,9 @@ import { ChevronLeft, ChevronRight, LayoutDashboard,
   Building2,
   Languages,
   Monitor,
-  ShieldCheck
+  ShieldCheck,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -43,7 +45,6 @@ import {
   DialogTitle 
 } from './ui/dialog';
 import { format } from 'date-fns';
-import { AppearanceSettings } from './AppearanceSettings';
 import { BanknotesIcon } from '@heroicons/react/24/outline'; // Or use IndianRupee from lucide-react? let's use lucide
 import { IndianRupee } from 'lucide-react';
 
@@ -57,10 +58,10 @@ import { hasAdminAccess, hasProjectManagementAccess, hasFinanceAccess, isLimited
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const { user, setUser, allUsers } = useUser();
+  const { themeMode, setThemeMode, colorTheme, workspaceLogo, workspaceName } = useTheme();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { language, setLanguage, t, translateData } = useLanguage();
   const [showHistory, setShowHistory] = React.useState(false);
-  const [showAppearance, setShowAppearance] = React.useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   React.useEffect(() => {
@@ -83,7 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'vendors', label: t('vendors'), icon: Building2 },
         { id: 'team', label: t('team'), icon: UsersIcon },
         { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee },
-        { id: 'file_controls', label: t('controls_portal'), icon: ShieldCheck }
+        { id: 'file_controls', label: t('control_panel'), icon: ShieldCheck }
       ];
     }
     
@@ -245,9 +246,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               variant="ghost" 
               size="icon" 
               className="rounded-full text-slate-500 relative mr-1"
-              onClick={() => setShowAppearance(true)}
+              onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
             >
-              <Monitor className="h-5 w-5" />
+              {themeMode === 'dark' || (themeMode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
             </Button>
 
             <DropdownMenu>
@@ -424,8 +429,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
           {children}
         </div>
-        
-        <AppearanceSettings open={showAppearance} onOpenChange={setShowAppearance} />
       </main>
     </div>
   );

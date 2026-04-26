@@ -170,7 +170,7 @@ export const translations: Record<Language, Record<string, string>> = {
     name: 'Name',
     completed_on: 'Completed On',
     petty_cash: 'Petty Cash',
-    controls_portal: 'Controls Portal',
+    control_panel: 'Control Panel',
     '3d_designer': '3D Designer',
     asst_sthapathy: 'Asst Sthapathy'
   },
@@ -343,7 +343,7 @@ export const translations: Record<Language, Record<string, string>> = {
     name: 'పేరు',
     completed_on: 'పూర్తయిన తేదీ',
     petty_cash: 'చిల్లర నగదు',
-    controls_portal: 'నియంత్రణల పోర్టల్',
+    control_panel: 'కంట్రోల్ ప్యానెల్',
     '3d_designer': '3D డిజైనర్',
     asst_sthapathy: 'అసిస్టెంట్ స్థపతి'
   }

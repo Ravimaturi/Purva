@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export type AccentColor = 'indigo' | 'rose' | 'emerald' | 'blue' | 'violet' | 'orange' | 'slate';
+export type AccentColor = 'indigo' | 'rose' | 'emerald' | 'blue' | 'violet' | 'orange' | 'slate' | string;
 export type DashboardStyle = 'shadow' | 'border' | 'glass' | 'flat';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -155,15 +155,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const PALETTES: Record<AccentColor, any> = {
-    indigo: { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-100 dark:border-indigo-500/20', progress: 'bg-indigo-500', hoverBg: 'hover:bg-indigo-500', solid: 'bg-indigo-600', solidHover: 'hover:bg-indigo-700' },
-    rose: { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-100 dark:border-rose-500/20', progress: 'bg-rose-500', hoverBg: 'hover:bg-rose-500', solid: 'bg-rose-600', solidHover: 'hover:bg-rose-700' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-100 dark:border-emerald-500/20', progress: 'bg-emerald-500', hoverBg: 'hover:bg-emerald-500', solid: 'bg-emerald-600', solidHover: 'hover:bg-emerald-700' },
-    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20', progress: 'bg-blue-500', hoverBg: 'hover:bg-blue-500', solid: 'bg-blue-600', solidHover: 'hover:bg-blue-700' },
-    violet: { bg: 'bg-violet-50 dark:bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-100 dark:border-violet-500/20', progress: 'bg-violet-500', hoverBg: 'hover:bg-violet-500', solid: 'bg-violet-600', solidHover: 'hover:bg-violet-700' },
-    orange: { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20', progress: 'bg-orange-500', hoverBg: 'hover:bg-orange-500', solid: 'bg-orange-600', solidHover: 'hover:bg-orange-700' },
-    slate: { bg: 'bg-slate-100 dark:bg-slate-800/40', text: 'text-slate-700 dark:text-zinc-300', border: 'border-slate-200 dark:border-white/10', progress: 'bg-slate-600', hoverBg: 'hover:bg-slate-600', solid: 'bg-slate-700', solidHover: 'hover:bg-slate-800' },
+  const PALETTES: Record<string, any> = {
+    indigo: { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-100 dark:border-indigo-500/20', progress: 'bg-indigo-500', hoverBg: 'hover:bg-indigo-500 hover:text-white', solid: 'bg-indigo-600 text-white', solidHover: 'hover:bg-indigo-700' },
+    rose: { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-100 dark:border-rose-500/20', progress: 'bg-rose-500', hoverBg: 'hover:bg-rose-500 hover:text-white', solid: 'bg-rose-600 text-white', solidHover: 'hover:bg-rose-700' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-100 dark:border-emerald-500/20', progress: 'bg-emerald-500', hoverBg: 'hover:bg-emerald-500 hover:text-white', solid: 'bg-emerald-600 text-white', solidHover: 'hover:bg-emerald-700' },
+    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20', progress: 'bg-blue-500', hoverBg: 'hover:bg-blue-500 hover:text-white', solid: 'bg-blue-600 text-white', solidHover: 'hover:bg-blue-700' },
+    violet: { bg: 'bg-violet-50 dark:bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-100 dark:border-violet-500/20', progress: 'bg-violet-500', hoverBg: 'hover:bg-violet-500 hover:text-white', solid: 'bg-violet-600 text-white', solidHover: 'hover:bg-violet-700' },
+    orange: { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20', progress: 'bg-orange-500', hoverBg: 'hover:bg-orange-500 hover:text-white', solid: 'bg-orange-600 text-white', solidHover: 'hover:bg-orange-700' },
+    slate: { bg: 'bg-slate-100 dark:bg-slate-800/40', text: 'text-slate-700 dark:text-zinc-300', border: 'border-slate-200 dark:border-white/10', progress: 'bg-slate-600', hoverBg: 'hover:bg-slate-600 hover:text-white', solid: 'bg-slate-700 text-white', solidHover: 'hover:bg-slate-800' },
   };
+
+  const getCustomPalette = () => ({
+    bg: 'theme-custom-bg',
+    text: 'theme-custom-text',
+    border: 'theme-custom-border',
+    progress: 'theme-custom-main',
+    hoverBg: 'theme-custom-hoverbg',
+    solid: 'theme-custom-main',
+    solidHover: 'theme-custom-solidhover'
+  });
 
   const getProjectColors = (index: number) => {
     if (isColorful) {
@@ -178,11 +188,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ];
       return colors[index % colors.length];
     }
-    return PALETTES[accentColor];
+    return accentColor.startsWith('#') ? getCustomPalette() : PALETTES[accentColor];
   };
 
   const getDashboardColors = () => {
-    return PALETTES[accentColor];
+    return accentColor.startsWith('#') ? getCustomPalette() : PALETTES[accentColor];
   };
 
   useEffect(() => {
@@ -245,6 +255,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       workspaceLogo, workspaceLogoFull, setWorkspaceLogo,
       getProjectColors, getDashboardColors 
     }}>
+      {accentColor.startsWith('#') && (
+        <style>{`
+          .theme-custom-bg { background-color: ${accentColor}1A; }
+          .dark .theme-custom-bg { background-color: ${accentColor}26; }
+          .theme-custom-text { color: ${accentColor}; }
+          .theme-custom-border { border-color: ${accentColor}33; }
+          .theme-custom-main { background-color: ${accentColor}; color: white; }
+          .theme-custom-hoverbg:hover { background-color: ${accentColor}; color: white; }
+          .theme-custom-solidhover:hover { background-color: ${accentColor}E6; color: white; }
+        `}</style>
+      )}
       {children}
     </ThemeContext.Provider>
   );
