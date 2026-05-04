@@ -16,7 +16,8 @@ import { ChevronLeft, ChevronRight, LayoutDashboard,
   Monitor,
   ShieldCheck,
   Sun,
-  Moon
+  Moon,
+  Briefcase
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -84,6 +85,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'vendors', label: t('vendors'), icon: Building2 },
         { id: 'team', label: t('team'), icon: UsersIcon },
         { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee },
+        { id: 'assets', label: 'Assets', icon: Briefcase },
         { id: 'file_controls', label: t('control_panel'), icon: ShieldCheck }
       ];
     }
@@ -94,7 +96,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'calendar', label: t('calendar'), icon: CalendarIcon },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
-        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee }
+        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee },
+        { id: 'assets', label: 'Assets', icon: Briefcase }
       ];
     }
     
@@ -103,7 +106,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
         { id: 'projects', label: t('projects'), icon: ListTodo },
         { id: 'vendors', label: t('vendors'), icon: Building2 },
-        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee }
+        { id: 'petty_cash', label: t('petty_cash'), icon: IndianRupee },
+        { id: 'assets', label: 'Assets', icon: Briefcase }
       ];
     }
     

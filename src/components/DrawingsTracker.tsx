@@ -26,7 +26,8 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   onFileUploaded
 }) => {
   const { instance, accounts, inProgress } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
+  const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
+  const isAuthenticated = useIsAuthenticated() || msalReady;
   const { user, allUsers } = useUser();
   const { canViewFile, canDownloadFile } = useFileSettings();
   const [isUploading, setIsUploading] = useState(false);
@@ -41,11 +42,12 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   };
 
   const getGraphClient = useCallback(async () => {
-    if (accounts.length === 0) throw new Error("No accounts found");
+    const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+    if (!activeAccount) throw new Error("No accounts found");
     
     const response = await instance.acquireTokenSilent({
       ...loginRequest,
-      account: accounts[0]
+      account: activeAccount
     });
 
     return Client.init({
@@ -53,11 +55,16 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
         done(null, response.accessToken);
       }
     });
-  }, [instance, accounts]);
+  }, [instance]);
 
   const handleViewFile = async (file: any) => {
     // If it's a microsoft file, we need to bypass iframe restrictions by fetching the raw BLOB
     if (file.url.includes('sharepoint.com') || file.url.includes('onedrive.live.com')) {
+      if (!isAuthenticated) {
+        toast.info("Please sign in to Microsoft first to view this file.");
+        handleLogin();
+        return;
+      }
       setIsPreviewLoading(file.id);
       try {
         const client = await getGraphClient();
@@ -83,23 +90,40 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
   };
 
   const handleNativeDownload = async (file: any) => {
+    if (file.url.includes('sharepoint.com') || file.url.includes('onedrive.live.com')) {
+      if (!isAuthenticated) {
+        toast.info("Please sign in to Microsoft first to download this file.");
+        handleLogin();
+        return;
+      }
+    }
     setIsPreviewLoading(file.id);
     try {
       if (file.url.includes('sharepoint.com') || file.url.includes('onedrive.live.com')) {
-        const client = await getGraphClient();
-        const base64 = btoa(file.url);
-        const encodedUrl = 'u!' + base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        
-        const blob = await client.api(`/shares/${encodedUrl}/driveItem/content`).responseType('blob').get();
-        const blobUrl = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        try {
+          const client = await getGraphClient();
+          const base64 = btoa(file.url);
+          const encodedUrl = 'u!' + base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          
+          const blob = await client.api(`/shares/${encodedUrl}/driveItem/content`).responseType('blob').get();
+          const blobUrl = URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        } catch (authError) {
+          console.warn("Not authenticated to download via Graph API, falling back to browser download:", authError);
+          const a = document.createElement('a');
+          a.href = file.url;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
       } else {
         const a = document.createElement('a');
         a.href = file.url;
@@ -111,7 +135,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       }
     } catch (error) {
       console.error("Failed to download file natively:", error);
-      toast.error("You do not have permission to download this file securely. Please contact an Administrator.");
+      toast.error("An error occurred while trying to download the file.");
     } finally {
       setIsPreviewLoading(null);
     }
@@ -128,37 +152,46 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
     });
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (inProgress !== "none") {
       toast.info("Authentication is already in progress. Please wait.");
       return;
     }
     
-    // Open a popup to our own app to initiate the redirect flow
-    // This bypasses iframe popup communication issues by using redirect inside the popup
     const width = 600;
     const height = 700;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
+    window.open(`${window.location.origin}?auth_action=login`, 'oauth_popup', `width=${width},height=${height},left=${left},top=${top}`);
     
-    window.open(
-      `${window.location.origin}?auth_action=login`, 
-      'oauth_popup', 
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    
-    // Poll localStorage for the account
-    const pollInterval = setInterval(() => {
-      const accounts = instance.getAllAccounts();
-      if (accounts.length > 0) {
-        clearInterval(pollInterval);
-        instance.setActiveAccount(accounts[0]);
+    const receiveMessage = async (event: MessageEvent) => {
+      if (typeof event.data === 'string' && event.data === 'msal_login_success') {
+        window.removeEventListener('message', receiveMessage);
+        setMsalReady(true);
         toast.success("Successfully logged in to Microsoft");
       }
-    }, 1000);
+    };
+    window.addEventListener('message', receiveMessage);
+    
+    // Fallback interval just in case postMessage fails
+    let attempts = 0;
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      if (attempts > 180) { // Stop after 3 mins
+        clearInterval(pollInterval);
+        return;
+      }
 
-    // Stop polling after 3 minutes
-    setTimeout(() => clearInterval(pollInterval), 180000);
+      try {
+        if (instance.getAllAccounts().length > 0) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', receiveMessage);
+          setMsalReady(true);
+        }
+      } catch (err) {
+        // Just ignore errors during polling
+      }
+    }, 1500);
   };
 
   const convertToWebP = (file: File): Promise<File> => {
@@ -212,15 +245,17 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
 
       const client = await getGraphClient();
       const folderName = projectName.replace(/[^a-zA-Z0-9 -]/g, '').trim();
+      const encodedFolder = encodeURIComponent('PurvaVedic_Projects') + '/' + encodeURIComponent(folderName);
+      const encodedFile = encodeURIComponent(file.name);
       const folderPath = `PurvaVedic_Projects/${folderName}`;
 
       if (file.size <= 4 * 1024 * 1024) {
         // Simple upload for small files (<= 4MB)
-        await client.api(`/me/drive/root:/${folderPath}/${file.name}:/content`)
+        await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/content`)
           .put(file);
       } else {
         // Large file upload session for files > 4MB (like large DWG files)
-        const uploadSession = await client.api(`/me/drive/root:/${folderPath}/${file.name}:/createUploadSession`).post({
+        const uploadSession = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createUploadSession`).post({
           item: {
             "@microsoft.graph.conflictBehavior": "replace",
             "name": file.name
@@ -260,7 +295,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       // Create an organization-wide sharing link so anyone in the company can view it
       let sharedUrl = '';
       try {
-        const permission = await client.api(`/me/drive/root:/${folderPath}/${file.name}:/createLink`).post({
+        const permission = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createLink`).post({
           type: 'view',
           scope: 'organization'
         });
@@ -268,7 +303,7 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
       } catch (linkError) {
         console.error("Error creating sharing link:", linkError);
         // Fallback to default webUrl if sharing link creation fails (e.g., admin disabled it)
-        const item = await client.api(`/me/drive/root:/${folderPath}/${file.name}`).get();
+        const item = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}`).get();
         sharedUrl = item.webUrl;
       }
 
@@ -312,28 +347,6 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">
-        <FolderOpen className="w-12 h-12 text-slate-400 mb-4" />
-        <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-2">OneDrive Integration</h3>
-        <p className="text-sm text-slate-500 dark:text-zinc-400 text-center max-w-md mb-6">
-          Sign in with your Microsoft account to access, upload, and manage project drawings and files directly from OneDrive.
-        </p>
-        <Button onClick={handleLogin} disabled={inProgress !== "none"} className="bg-[#0078D4] hover:bg-[#006CBF] text-white">
-          {inProgress !== "none" ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Connecting...
-            </>
-          ) : (
-            "Sign in with Microsoft"
-          )}
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -347,14 +360,38 @@ export const DrawingsTracker: React.FC<DrawingsTrackerProps> = ({
             id="file-upload"
             className="hidden"
             onChange={handleFileUpload}
-            disabled={isUploading}
+            disabled={isUploading || !isAuthenticated}
           />
-          <Button disabled={isUploading} onClick={() => document.getElementById('file-upload')?.click()}>
-            {isUploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+          <Button 
+            disabled={isUploading || !isAuthenticated} 
+            onClick={() => {
+              document.getElementById('file-upload')?.click();
+            }}
+          >
+            {isUploading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Upload className="w-4 h-4 mr-2" />
+            )}
             Upload File
           </Button>
         </div>
       </div>
+
+      {!isAuthenticated && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center text-blue-800 dark:text-blue-300">
+            <Loader2 className="w-5 h-5 mr-3 hidden" />
+            <div>
+              <p className="font-bold text-sm">Authentication Required</p>
+              <p className="text-xs opacity-90">Please sign in with your Microsoft account to view and download secure project files.</p>
+            </div>
+          </div>
+          <Button onClick={handleLogin} disabled={inProgress !== "none"} className="bg-[#0078D4] hover:bg-[#006CBF] text-white whitespace-nowrap ml-4">
+            {inProgress !== "none" ? "Connecting..." : "Sign in with Microsoft"}
+          </Button>
+        </div>
+      )}
 
       {projectFiles.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-[#121212]">

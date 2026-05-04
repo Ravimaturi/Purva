@@ -17,8 +17,11 @@ import { FileControls } from './components/FileControls';
 import { Toaster } from './components/ui/sonner';
 import { Sheet, SheetContent } from './components/ui/sheet';
 import { ProjectDetails } from './components/ProjectDetails';
+import { AssetManagement } from './components/AssetManagement';
 import { Project } from './types';
 import { cn } from './lib/utils';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { FileSettingsProvider } from './contexts/FileSettingsContext';
 import { msalInstance, loginRequest } from './lib/msalConfig';
 
 function MainApp() {
@@ -33,12 +36,53 @@ function MainApp() {
   // Handle the special popup redirect flow
   useEffect(() => {
     if (window.location.search.includes('auth_action=login')) {
-      msalInstance.loginRedirect({
-        ...loginRequest,
-        prompt: 'select_account'
-      });
+      if (msalInstance.getAllAccounts().length > 0) {
+        // We already have an account logged in! Close the popup.
+        if (window.opener && window.opener !== window) {
+          window.close();
+        }
+      } else {
+        // Set this session storage flag so when MSAL redirects back, we know this tab is just a popup
+        sessionStorage.setItem('is_msal_popup', 'true');
+        // Only trigger login if no accounts are present
+        msalInstance.loginRedirect({
+          ...loginRequest,
+          prompt: 'select_account'
+        });
+      }
     }
   }, []);
+
+  const isOAuthCallback = window.location.search.includes('code=') || window.location.hash.includes('code=');
+  const isAuthAction = window.location.search.includes('auth_action=login');
+  const isPopupAuth = (window.opener && window.opener !== window) || sessionStorage.getItem('is_msal_popup') === 'true' || isOAuthCallback || isAuthAction;
+
+  useEffect(() => {
+    if (isPopupAuth) {
+      const checkInterval = setInterval(() => {
+        if (msalInstance.getAllAccounts().length > 0) {
+          clearInterval(checkInterval);
+          sessionStorage.removeItem('is_msal_popup');
+          if (window.opener && window.opener !== window) {
+            window.opener.postMessage('msal_login_success', window.location.origin);
+          }
+          window.close();
+        }
+      }, 500);
+
+      // Fallback: close after some time to avoid hanging process
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval);
+        sessionStorage.removeItem('is_msal_popup');
+        window.close();
+      }, 10000);
+
+      return () => {
+        clearInterval(checkInterval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [isPopupAuth]);
 
   if (loading) {
     return (
@@ -48,29 +92,19 @@ function MainApp() {
     );
   }
 
-  // Detect if this is the MSAL OAuth callback window (popup or redirect)
-  // We check for 'code' and 'state' in the URL which are standard OAuth parameters
-  const isOAuthCallback = window.location.search.includes('code=') && window.location.search.includes('state=') || 
-                          window.location.hash.includes('code=') && window.location.hash.includes('state=');
-
-  // If this window is a popup or an OAuth callback, don't render the main app.
-  // Just show a loading state while MSAL processes the authentication and closes the window.
-  if ((window.opener && window.opener !== window) || isOAuthCallback) {
-    // Attempt to close the window automatically after a delay, in case MSAL fails to close it
-    // due to cross-origin opener policies severing the window.opener connection.
-    if (isOAuthCallback) {
-      setTimeout(() => {
-        window.close();
-      }, 3000);
-    }
-    
+  // If this window is a popup or OAuth callback, don't render the main app.
+  // Just show a loading state while MSAL/Supabase processes the authentication.
+  if (isPopupAuth) {
     return (
       <div className="min-h-screen bg-[#FFFFF0] dark:bg-slate-950 flex flex-col items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin mb-4" />
-        <p className="text-slate-500 font-medium">Completing Microsoft authentication...</p>
+        <p className="text-slate-500 font-medium">Completing authentication...</p>
         <p className="text-slate-400 text-sm mt-2">This window should close automatically.</p>
         <button 
-          onClick={() => window.close()} 
+          onClick={() => {
+            sessionStorage.removeItem('is_msal_popup');
+            window.close();
+          }} 
           className="mt-6 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-sm transition-colors"
         >
           Close Window
@@ -114,6 +148,8 @@ function MainApp() {
         return <PettyCash />;
       case 'file_controls':
         return <FileControls />;
+      case 'assets':
+        return <AssetManagement />;
       case 'profile':
         return <Profile />;
       default:
@@ -155,9 +191,6 @@ function MainApp() {
     </>
   );
 }
-
-import { ThemeProvider } from './contexts/ThemeContext';
-import { FileSettingsProvider } from './contexts/FileSettingsContext';
 
 export default function App() {
   return (

@@ -46,24 +46,18 @@ export const PettyCash = () => {
   const { canManagePettyCash } = useFileSettings();
   const isAdmin = canManagePettyCash(user?.role, 'edit') || hasAdminAccess(user?.role);
   const canCreate = canManagePettyCash(user?.role, 'create');
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
+  const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
   
   const getGraphClient = useCallback(async () => {
-    if (accounts.length === 0) {
-      // Trigger login if not authenticated
-      const top = window.screenY + (window.outerHeight - 600) / 2;
-      const left = window.screenX + (window.outerWidth - 500) / 2;
-      window.open(
-        `${window.location.origin}?auth_action=login`, 
-        'oauth_popup', 
-        `width=${500},height=${600},left=${left},top=${top}`
-      );
-      throw new Error("Not logged into Microsoft. Please authorize the popup.");
+    const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+    if (!activeAccount) {
+      throw new Error("Not logged into Microsoft. Please authenticate.");
     }
     
     const response = await instance.acquireTokenSilent({
       ...loginRequest,
-      account: accounts[0]
+      account: activeAccount
     });
     
     return Client.init({
@@ -71,7 +65,7 @@ export const PettyCash = () => {
         done(null, response.accessToken);
       }
     });
-  }, [instance, accounts]);
+  }, [instance]);
   
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
@@ -239,11 +233,13 @@ export const PettyCash = () => {
         try {
           const client = await getGraphClient();
           const folderPath = `PurvaVedic_PettyCash_Receipts/${user.id}`;
+          const encodedFolder = encodeURIComponent('PurvaVedic_PettyCash_Receipts') + '/' + encodeURIComponent(user.id);
+          const encodedFile = encodeURIComponent(receiptFile.name);
           
           if (receiptFile.size <= 4 * 1024 * 1024) {
-             await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/content`).put(receiptFile);
+             await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/content`).put(receiptFile);
           } else {
-             const uploadSession = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/createUploadSession`).post({
+             const uploadSession = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createUploadSession`).post({
                item: {
                  "@microsoft.graph.conflictBehavior": "replace",
                  "name": receiptFile.name
@@ -270,14 +266,14 @@ export const PettyCash = () => {
           
           let sharedUrl = '';
           try {
-            const permission = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}:/createLink`).post({
+            const permission = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createLink`).post({
               type: 'view',
               scope: 'organization'
             });
             sharedUrl = permission.link.webUrl;
           } catch (linkError) {
              console.error("Error creating sharing link:", linkError);
-             const item = await client.api(`/me/drive/root:/${folderPath}/${receiptFile.name}`).get();
+             const item = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}`).get();
              sharedUrl = item.webUrl;
           }
           finalReceiptUrl = sharedUrl;
@@ -633,24 +629,50 @@ export const PettyCash = () => {
             <div className="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
               <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Receipt Image (Microsoft OneDrive)</label>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                {accounts.length === 0 ? (
+                {!msalReady ? (
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => {
+                    onClick={async () => {
+                      if (inProgress !== "none") {
+                        toast.info("Authentication is already in progress. Please wait.");
+                        return;
+                      }
+                      
                       const width = 600;
                       const height = 700;
                       const left = window.screenX + (window.outerWidth - width) / 2;
                       const top = window.screenY + (window.outerHeight - height) / 2;
                       window.open(`${window.location.origin}?auth_action=login`, 'oauth_popup', `width=${width},height=${height},left=${left},top=${top}`);
-                      const pollInterval = setInterval(() => {
-                        if (instance.getAllAccounts().length > 0) {
-                          clearInterval(pollInterval);
-                          instance.setActiveAccount(instance.getAllAccounts()[0]);
+                      
+                      const receiveMessage = async (event: MessageEvent) => {
+                        if (typeof event.data === 'string' && event.data === 'msal_login_success') {
+                          window.removeEventListener('message', receiveMessage);
+                          setMsalReady(true);
                           toast.success("Successfully logged in to Microsoft");
                         }
-                      }, 1000);
-                      setTimeout(() => clearInterval(pollInterval), 180000);
+                      };
+                      window.addEventListener('message', receiveMessage);
+                      
+                      // Fallback interval just in case postMessage fails
+                      let attempts = 0;
+                      const pollInterval = setInterval(async () => {
+                        attempts++;
+                        if (attempts > 180) { // Stop after 3 mins
+                          clearInterval(pollInterval);
+                          return;
+                        }
+
+                        try {
+                          if (instance.getAllAccounts().length > 0) {
+                            clearInterval(pollInterval);
+                            window.removeEventListener('message', receiveMessage);
+                            setMsalReady(true);
+                          }
+                        } catch (err) {
+                          // Just ignore errors during polling
+                        }
+                      }, 1500);
                     }}
                     className="border-[#0078D4] text-[#0078D4] hover:bg-[#0078D4]/5 dark:border-[#0078D4] dark:hover:bg-[#0078D4]/20"
                   >

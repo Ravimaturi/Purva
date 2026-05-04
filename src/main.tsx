@@ -7,9 +7,10 @@ import './index.css';
 
 // Initialize the MSAL instance before rendering
 msalInstance.initialize().then(() => {
-  // Handle the redirect flow response
+  // Always call handleRedirectPromise to process the hash in the popup window
+  // When inside a popup, this will parse the hash, send it to the main window, and close the popup.
   msalInstance.handleRedirectPromise().catch(err => {
-    console.error("MSAL redirect error:", err);
+    console.error("MSAL handleRedirectPromise error:", err);
   });
 
   createRoot(document.getElementById('root')!).render(

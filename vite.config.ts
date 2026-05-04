@@ -8,26 +8,35 @@ import { VitePWA } from 'vite-plugin-pwa';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  build: {
+    outDir: 'dist',
+  },
   plugins: [
     react(), 
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 3000000
       },
       manifest: {
-        name: 'Purva Vedic Consultancy, Project Management application',
+        name: 'Purva Vedic Consultancy',
         short_name: 'Purva Vedic',
         description: 'Project Management application for Purva Vedic Consultancy',
         theme_color: '#4f46e5',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/',
         icons: [
           {
-            src: 'icon.svg',
-            sizes: '192x192 512x512',
-            type: 'image/svg+xml',
+            src: '/icon-512x512.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]

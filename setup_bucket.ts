@@ -11,10 +11,14 @@ async function setup() {
     public: true,
     fileSizeLimit: 10485760, // 10MB
   });
-  if (error && error.message !== 'The resource already exists') {
-    console.error('Bucket creation error:', error);
+  const { data: pfData, error: pfError } = await supabase.storage.createBucket('project_files', {
+    public: true,
+    fileSizeLimit: 52428800, // 50MB
+  });
+  if (pfError && pfError.message !== 'The resource already exists') {
+    console.error('Bucket creation error for project_files:', pfError);
   } else {
-    console.log('Bucket "petty_cash_receipts" is ready.');
+    console.log('Bucket "project_files" is ready.');
   }
 }
 setup();
