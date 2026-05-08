@@ -40,14 +40,16 @@ import {
   User as UserIcon,
   Mail,
   ArrowUpDown,
-  Filter
+  Filter,
+  Key
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdminAuth } from '../lib/supabase';
 import { Profile, UserRole, RoleLabels, hasAdminAccess } from '../types';
 import { toast } from 'sonner';
 import { useUser } from '../contexts/UserContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { cn, getInitials } from '../lib/utils';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export const TeamManagement: React.FC = () => {
   const { user: currentUser } = useUser();
@@ -55,8 +57,11 @@ export const TeamManagement: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [password, setPassword] = useState('');
   const [editData, setEditData] = useState({
     full_name: '',
     email: '',
@@ -128,21 +133,40 @@ export const TeamManagement: React.FC = () => {
     }
   };
 
-  const deleteUser = async (id: string) => {
+  const handleSendPasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      toast.success('Password reset link sent to user\'s email!');
+    } catch (err: any) {
+      toast.error(`Failed to send password reset link: ${err.message}`);
+    }
+  };
+
+  const confirmDeleteUser = (id: string) => {
     if (id === currentUser?.id) {
       toast.error("You cannot delete yourself!");
       return;
     }
-    
-    if (!confirm('Are you sure you want to remove this team member?')) return;
+    setUserToDelete(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const deleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      const { error } = await supabase.from('profiles').delete().eq('id', userToDelete);
       if (error) throw error;
       toast.success('User removed');
+      setIsDeleteConfirmOpen(false);
+      setUserToDelete(null);
       fetchUsers();
-    } catch (err) {
-      toast.error('Failed to remove user');
+    } catch (err: any) {
+      toast.error('Failed to remove user: ' + (err.message || 'Unknown error'));
+      console.error(err);
     }
   };
 
@@ -212,6 +236,7 @@ export const TeamManagement: React.FC = () => {
             className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm dark:shadow-none gap-2"
             onClick={() => {
               setSelectedUser(null);
+              setPassword('');
               setEditData({ full_name: '', email: '', role: 'employee', emp_code: '', designation: '', DOJ: '' });
               setIsEditDialogOpen(true);
             }}
@@ -359,7 +384,7 @@ export const TeamManagement: React.FC = () => {
                       variant="ghost" 
                       size="icon" 
                       className="h-8 w-8 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      onClick={() => deleteUser(u.id)}
+                      onClick={() => confirmDeleteUser(u.id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -372,82 +397,115 @@ export const TeamManagement: React.FC = () => {
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-3xl border-none shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold tracking-tight">
+        <DialogContent className="sm:max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden p-0 dark:bg-slate-900 bg-white">
+          <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               {selectedUser ? 'Edit Member' : 'Add New Member'}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={selectedUser ? handleUpdateUser : async (e) => {
             e.preventDefault();
             try {
-              const { error } = await supabase.from('profiles').insert([editData]);
-              if (error) throw error;
-              toast.success('Member added');
+              if (!password) {
+                toast.error('Password is required for new users');
+                return;
+              }
+              const { data: authData, error: authError } = await supabaseAdminAuth.auth.signUp({
+                email: editData.email,
+                password: password,
+              });
+              if (authError) throw authError;
+
+              if (authData.user) {
+                const { error } = await supabase.from('profiles').upsert([{ 
+                  id: authData.user.id,
+                  ...editData 
+                }]);
+                if (error) {
+                  console.error("Profile upsert error:", error);
+                  // Ignore if RLS blocks it, assuming a trigger might have done it
+                }
+              }
+
+              toast.success('Member added successfully');
               setIsEditDialogOpen(false);
+              setPassword('');
               fetchUsers();
             } catch (err: any) {
               toast.error(err.message);
             }
-          }} className="space-y-6 py-4">
-            <div className="space-y-2">
+          }} className="p-6 space-y-5">
+            <div className="space-y-1.5">
               <Label htmlFor="full_name" className="text-xs font-bold uppercase tracking-widest text-slate-400">Full Name</Label>
               <Input 
                 id="full_name" 
                 required 
-                className="rounded-xl border-slate-200 dark:border-slate-800"
+                className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
                 value={editData.full_name}
                 onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-slate-400">Email Address</Label>
               <Input 
                 id="email" 
                 type="email"
                 required 
-                className="rounded-xl border-slate-200 dark:border-slate-800"
+                className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
                 value={editData.email}
                 onChange={(e) => setEditData({ ...editData, email: e.target.value })}
               />
             </div>
+            {!selectedUser && (
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-slate-400">Password</Label>
+                <Input 
+                  id="password" 
+                  type="password"
+                  required 
+                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="emp_code" className="text-xs font-bold uppercase tracking-widest text-slate-400">EMP Code</Label>
                 <Input 
                   id="emp_code" 
-                  className="rounded-xl border-slate-200 dark:border-slate-800"
+                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
                   value={editData.emp_code}
                   onChange={(e) => setEditData({ ...editData, emp_code: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="designation" className="text-xs font-bold uppercase tracking-widest text-slate-400">Designation</Label>
                 <Input 
                   id="designation" 
-                  className="rounded-xl border-slate-200 dark:border-slate-800"
+                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
                   value={editData.designation}
                   onChange={(e) => setEditData({ ...editData, designation: e.target.value })}
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="DOJ" className="text-xs font-bold uppercase tracking-widest text-slate-400">Date of Joining (DOJ)</Label>
               <Input 
                 id="DOJ" 
                 type="date"
-                className="rounded-xl border-slate-200 dark:border-slate-800"
+                className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500 block w-full"
                 value={editData.DOJ}
                 onChange={(e) => setEditData({ ...editData, DOJ: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 pb-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Role</Label>
               <Select 
                 value={editData.role} 
                 onValueChange={(v) => setEditData({ ...editData, role: v as UserRole })}
               >
-                <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-800">
+                <SelectTrigger className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -457,25 +515,47 @@ export const TeamManagement: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter className="pt-4">
-              <Button 
-                type="button" 
-                variant="ghost" 
-                onClick={() => setIsEditDialogOpen(false)}
-                className="rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-8 shadow-sm dark:shadow-none"
-              >
-                {selectedUser ? 'Save Changes' : 'Add Member'}
-              </Button>
+            <DialogFooter className="pt-4 flex sm:justify-between items-center w-full border-t border-slate-100 dark:border-slate-800/60 mt-4">
+              {selectedUser ? (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => handleSendPasswordReset(editData.email)}
+                  className="rounded-xl border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-900/50 dark:text-orange-500 dark:hover:bg-orange-900/20 px-4"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Reset Password Link
+                </Button>
+              ) : (
+                <div />
+              )}
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="rounded-xl font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="rounded-xl bg-[#f35b04] hover:bg-[#d64e03] text-white px-6 font-bold"
+                >
+                  {selectedUser ? 'Save Changes' : 'Add Member'}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog 
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        onConfirm={deleteUser}
+        title="Delete Team Member"
+        description="Are you sure you want to remove this team member? This action cannot be undone."
+      />
     </div>
   );
 };

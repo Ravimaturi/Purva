@@ -31,6 +31,11 @@ export interface FilePermissionsConfig {
     edit: UserRole[];
     delete: UserRole[];
   };
+  assets: {
+    create: UserRole[];
+    edit: UserRole[];
+    delete: UserRole[];
+  };
 }
 
 const DEFAULT_CONFIG: FilePermissionsConfig = {
@@ -71,6 +76,11 @@ const DEFAULT_CONFIG: FilePermissionsConfig = {
     create: ['admin', 'finance_manager'],
     edit: ['admin', 'finance_manager'],
     delete: ['admin']
+  },
+  assets: {
+    create: ['admin', 'finance_manager'],
+    edit: ['admin', 'finance_manager'],
+    delete: ['admin']
   }
 };
 
@@ -83,6 +93,7 @@ interface FileSettingsContextType {
   canManageTasks: (role: UserRole | undefined, action: 'create' | 'edit' | 'delete') => boolean;
   canManageVendors: (role: UserRole | undefined, action: 'create' | 'edit' | 'delete') => boolean;
   canManagePettyCash: (role: UserRole | undefined, action: 'create' | 'edit' | 'delete') => boolean;
+  canManageAssets: (role: UserRole | undefined, action: 'create' | 'edit' | 'delete') => boolean;
 }
 
 const FileSettingsContext = createContext<FileSettingsContextType | undefined>(undefined);
@@ -102,7 +113,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({ childr
           projects: parsed.projects || DEFAULT_CONFIG.projects,
           tasks: parsed.tasks || DEFAULT_CONFIG.tasks,
           vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
-          pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash
+          pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
+          assets: parsed.assets || DEFAULT_CONFIG.assets
         });
       } catch (e) {
         console.error("Failed to parse file permissions from local storage");
@@ -161,6 +173,12 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({ childr
     return config.pettyCash[action].includes(role);
   };
 
+  const canManageAssets = (role: UserRole | undefined, action: 'create' | 'edit' | 'delete') => {
+    if (!role) return false;
+    if (role === 'admin') return true;
+    return config.assets[action].includes(role);
+  };
+
   return (
     <FileSettingsContext.Provider value={{ 
       config, 
@@ -170,7 +188,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({ childr
       canManageProjects, 
       canManageTasks,
       canManageVendors,
-      canManagePettyCash
+      canManagePettyCash,
+      canManageAssets
     }}>
       {children}
     </FileSettingsContext.Provider>

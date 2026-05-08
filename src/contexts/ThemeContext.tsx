@@ -69,6 +69,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    // Attempt to sync to Supabase (debounce this in a real app, but this will do for simple settings)
+    const syncThemeToSupabase = async () => {
+      try {
+        const { data } = await supabase.from('workspace_settings').select('id').limit(1).maybeSingle();
+        const updateData = { 
+          accent_color: accentColor, 
+          dashboard_style: dashboardStyle, 
+          is_colorful: isColorful, 
+          theme_mode: themeMode 
+        };
+        if (data?.id) {
+          await supabase.from('workspace_settings').update(updateData).eq('id', data.id);
+        } else {
+          await supabase.from('workspace_settings').insert([updateData]);
+        }
+      } catch (err) {
+        // Ignore errors if table doesn't exist
+      }
+    };
+    // Let it run async without blocking
+    void syncThemeToSupabase();
+
   }, [accentColor, dashboardStyle, isColorful, themeMode]);
 
   // Listen for system theme changes if using 'system'
@@ -105,6 +128,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (data.workspace_name) setWorkspaceNameState(data.workspace_name);
           if (data.logo_url) setWorkspaceLogoState(data.logo_url);
           if (data.full_logo_url !== undefined) setWorkspaceLogoFullState(data.full_logo_url);
+          if (data.accent_color) setAccentColor(data.accent_color as AccentColor);
+          if (data.dashboard_style) setDashboardStyle(data.dashboard_style as DashboardStyle);
+          if (data.is_colorful !== null) setIsColorful(data.is_colorful);
+          if (data.theme_mode) setThemeMode(data.theme_mode as ThemeMode);
         }
       } catch (err) {
         // Table probably doesn't exist yet, ignore

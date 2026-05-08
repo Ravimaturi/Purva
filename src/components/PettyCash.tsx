@@ -846,14 +846,14 @@ export const PettyCash = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center">
                        Date Range
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-1 2xl:grid-cols-[1fr,auto,1fr] items-center gap-2 w-full">
                       <input 
                         type="date" 
                         value={dateRange.start}
                         onChange={e => setDateRange({...dateRange, start: e.target.value})}
                         className="w-full text-sm border-slate-300 border dark:border-white/10 rounded-md p-2 bg-slate-50 dark:bg-black text-slate-800 dark:text-zinc-200 outline-none"
                       />
-                      <span className="text-slate-400">to</span>
+                      <span className="text-slate-400 hidden 2xl:block text-center text-xs uppercase font-bold">to</span>
                       <input 
                         type="date" 
                         value={dateRange.end}
@@ -912,7 +912,7 @@ export const PettyCash = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="col-span-1 lg:col-span-2 space-y-6">
+            <div className="col-span-1 lg:col-span-2 space-y-6 min-w-0">
 
               {/* Transactions Table */}
               <div className="bg-white dark:bg-[#121212] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">

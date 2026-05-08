@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Vendor, VendorOrder, Project } from '../types';
-import { Plus, Building2, FileText, CheckCircle2, Clock, MessageSquare, IndianRupee } from 'lucide-react';
+import { Plus, Building2, FileText, CheckCircle2, Clock, MessageSquare, IndianRupee, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { supabase } from '../lib/supabase';
 import { PaymentStageHistory } from './PaymentStageHistory';
+import { ConfirmDialog } from './ConfirmDialog';
+import { toast } from 'sonner';
 
 interface Props {
   project: Project;
@@ -42,6 +44,8 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
   const [amountPaid, setAmountPaid] = useState('');
   const [status, setStatus] = useState<VendorOrder['status']>('Pending');
   const [comments, setComments] = useState('');
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const projectOrders = orders.filter(o => o.project_id === project.id);
 
@@ -105,6 +109,21 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
     }
   };
 
+  const deleteOrder = async () => {
+    if (!orderToDelete) return;
+    try {
+      const { error } = await supabase.from('vendor_orders').delete().eq('id', orderToDelete);
+      if (error) throw error;
+      setOrders(orders.filter(o => o.id !== orderToDelete));
+      toast.success('Order deleted successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete order');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setOrderToDelete(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -138,16 +157,29 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
                     </div>
                   </div>
                 </div>
-                <Select value={order.status} onValueChange={(val: any) => updateOrderStatus(order.id, val)}>
-                  <SelectTrigger className="w-[130px] h-8 text-xs rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select value={order.status} onValueChange={(val: any) => updateOrderStatus(order.id, val)}>
+                    <SelectTrigger className="w-[130px] h-8 text-xs rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/30 rounded-lg"
+                    onClick={() => {
+                      setOrderToDelete(order.id);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
               
               <div className="mb-4">
@@ -261,6 +293,14 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
           </form>
         </DialogContent>
       </Dialog>
+      
+      <ConfirmDialog 
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={deleteOrder}
+        title="Delete Order"
+        description="Are you sure you want to delete this order? This action cannot be undone."
+      />
     </div>
   );
 };

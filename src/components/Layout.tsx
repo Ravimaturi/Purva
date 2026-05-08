@@ -207,7 +207,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   };
 
   return (
-    <div className="flex h-screen bg-[#FFFFF0] dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
+    <div className="flex h-screen bg-[#FFFFF0] dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className={cn("hidden lg:flex bg-white dark:bg-[#121212] dark:bg-slate-900 dark:border-slate-800 border-r border-slate-200 dark:border-slate-800 flex-col shrink-0 transition-all duration-300 relative", isSidebarCollapsed ? "w-20" : "w-64")}>
         {renderSidebarContent(isSidebarCollapsed)}
@@ -222,7 +222,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
@@ -241,7 +241,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             </Sheet>
             
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 capitalize">
-              {t(activeTab.replace('-', '_'))}
+              {activeTab === 'file_controls' ? t('control_panel') : t(activeTab.replace('-', '_'))}
             </h2>
           </div>
 
@@ -430,7 +430,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </Dialog>
 
         {/* Content Area */}
-        <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-8 overflow-y-auto overflow-x-hidden">
           {children}
         </div>
       </main>

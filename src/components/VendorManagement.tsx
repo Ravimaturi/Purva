@@ -135,6 +135,11 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
   const handleDeleteConfirm = async () => {
     if (!selectedVendor) return;
 
+    // First delete vendor orders manually just in case CASCADE isn't set up
+    await supabase.from('vendor_orders').delete().eq('vendor_id', selectedVendor.id).then(({error}) => {
+      if (error) console.warn("Could not delete related vendor orders:", error);
+    });
+
     const { error } = await supabase
       .from('vendors')
       .delete()
@@ -444,13 +449,13 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
       </Dialog>
 
       <ConfirmDialog
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => setIsDeleteConfirmOpen(false)}
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => setIsDeleteConfirmOpen(open)}
         onConfirm={handleDeleteConfirm}
         title="Delete Vendor"
-        message={`Are you sure you want to delete ${selectedVendor?.vendor_name}? This action cannot be undone.`}
+        description={`Are you sure you want to delete ${selectedVendor?.vendor_name}? This action cannot be undone.`}
         confirmText="Delete Vendor"
-        isDestructive={true}
+        variant="destructive"
       />
     </div>
   );

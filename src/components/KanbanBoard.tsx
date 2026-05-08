@@ -13,6 +13,7 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -122,6 +123,13 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onClick }) =>
   );
 };
 
+const DroppableColumn = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
+  const { setNodeRef } = useDroppable({
+    id,
+  });
+  return <div ref={setNodeRef} className={className}>{children}</div>;
+};
+
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange, onTaskClick }) => {
   const { translateData } = useLanguage();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -205,16 +213,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onStatusChange,
               items={tasks.filter(t => t.status === column.status).map(t => t.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="flex-1 bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-slate-800/40 rounded-[32px] p-4 space-y-4 border border-slate-100 dark:border-slate-800/50 backdrop-blur-sm">
+              <DroppableColumn id={column.status} className="flex-1 bg-slate-50 dark:bg-[#0a0a0a] dark:bg-slate-950 dark:border-slate-800/40 rounded-[32px] p-4 space-y-4 border border-slate-100 dark:border-slate-800/50 backdrop-blur-sm">
                 {tasks.filter(t => t.status === column.status).map((task) => (
                   <SortableTaskCard key={task.id} task={task} onClick={onTaskClick} />
                 ))}
                 {tasks.filter(t => t.status === column.status).length === 0 && (
-                  <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900/30">
+                  <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900/30 pointer-events-none">
                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Drop tasks here</p>
                   </div>
                 )}
-              </div>
+              </DroppableColumn>
             </SortableContext>
           </div>
         ))}
