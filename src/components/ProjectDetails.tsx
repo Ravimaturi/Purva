@@ -1123,9 +1123,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     </SelectTrigger>
                     <SelectContent className="rounded-xl z-[150]">
                       <SelectItem value="Unassigned">Unassigned</SelectItem>
-                      {allUsers.map((u) => (
-                        <SelectItem key={u.id} value={u.full_name}>
-                          {u.full_name}
+                      {Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
+                        <SelectItem key={displayName} value={displayName}>
+                          {displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1539,9 +1539,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           <SelectItem value="Unassigned">Unassigned</SelectItem>
                           {hasProjectManagementAccess(user?.role) ||
                           project.assigned_to === user?.full_name ? (
-                            allUsers.map((u) => (
-                              <SelectItem key={u.id} value={u.full_name}>
-                                {u.full_name}
+                            Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
+                              <SelectItem key={displayName} value={displayName}>
+                                {displayName}
                               </SelectItem>
                             ))
                           ) : project.assigned_to ? (
@@ -2282,10 +2282,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             <SelectItem value="Unassigned">
                               Unassigned
                             </SelectItem>
-                            {allUsers.map((u) => (
-                              <SelectItem key={u.id} value={u.full_name}>
-                                {u.full_name}
-                              </SelectItem>
+                            {Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
+                                <SelectItem key={displayName} value={displayName}>
+                                  {displayName}
+                                </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -2380,9 +2380,22 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             <div className="p-6 border-t border-slate-100 dark:border-white/10 bg-white dark:bg-[#121212]">
               <Button
                 className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl font-bold h-12 shadow-lg shadow-indigo-100 dark:shadow-none transition-all active:scale-95"
-                onClick={() =>
-                  isEditing ? handleUpdateProject() : setIsEditing(true)
-                }
+                onClick={() => {
+                  if (isEditing) {
+                    handleUpdateProject();
+                  } else {
+                    setEditData({
+                      name: project.name,
+                      client_name: project.client_name,
+                      description: project.description || "",
+                      progress: project.progress,
+                      status: project.status,
+                      deadline: project.deadline || "",
+                      assigned_to: project.assigned_to || "",
+                    });
+                    setIsEditing(true);
+                  }
+                }}
               >
                 {isEditing ? "Save Changes" : "Edit Details"}
               </Button>
@@ -2505,13 +2518,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     >
                       Unassigned
                     </SelectItem>
-                    {allUsers.map((u) => (
+                    {Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
                       <SelectItem
-                        key={u.id}
-                        value={u.full_name}
+                        key={displayName}
+                        value={displayName}
                         className="dark:text-zinc-300 dark:hover:bg-[#181818]"
                       >
-                        {u.full_name}
+                        {displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>

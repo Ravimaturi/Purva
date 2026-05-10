@@ -49,7 +49,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
     client_name: '',
     description: '',
     status: PROJECT_STAGES[0],
-    assigned_to: allUsers[0]?.full_name || '',
+    assigned_to: 'Unassigned',
     deadline: '',
     logo_url: '',
   });
@@ -82,10 +82,12 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
     setLoading(true);
 
     try {
+      const finalAssignee = formData.assigned_to === 'Unassigned' ? null : formData.assigned_to;
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert({
           ...formData,
+          assigned_to: finalAssignee,
           progress: 0,
           last_updated: new Date().toISOString(),
         })
@@ -94,29 +96,10 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
 
       if (projectError) throw projectError;
 
-      // Automatically insert tasks based on the initial status
-      const templates = TASK_TEMPLATES[formData.status] || [];
-      if (templates.length > 0 && projectData) {
-        const tasksToInsert = templates.map(title => ({
-          project_id: projectData.id,
-          title,
-          status: 'Todo',
-          priority: 'Medium',
-          assigned_to: formData.assigned_to,
-          deadline: formData.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }));
-
-        const { error: tasksError } = await supabase.from('tasks').insert(tasksToInsert);
-        if (tasksError) {
-          console.error('Error inserting template tasks:', tasksError);
-          toast.error('Project created, but failed to add initial tasks.');
-        }
-      }
-
       await addNotification('New Project Created', `Project "${formData.name}" has been created by ${user?.full_name || 'an employee'}.`);
       
       // Notify assignee
-      if (formData.assigned_to && user && formData.assigned_to !== user.full_name) {
+      if (formData.assigned_to && formData.assigned_to !== 'Unassigned' && user && formData.assigned_to !== user.full_name) {
         const assignee = allUsers.find(u => u.full_name === formData.assigned_to || u.id === formData.assigned_to);
         if (assignee && assignee.id !== user.id) {
           await addNotification(
@@ -127,7 +110,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
         }
       }
       
-      toast.success('Project created successfully with initial tasks');
+      toast.success('Project created successfully');
       onSuccess();
       onOpenChange(false);
       setFormData({
@@ -135,7 +118,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
         client_name: '',
         description: '',
         status: PROJECT_STAGES[0],
-        assigned_to: allUsers[0]?.full_name || '',
+        assigned_to: 'Unassigned',
         deadline: '',
       });
     } catch (err: any) {
@@ -218,8 +201,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl dark:bg-[#181818] dark:border-white/10">
-                  {allUsers.map(u => (
-                    <SelectItem key={u.id} value={u.full_name} className="dark:text-zinc-300 dark:hover:bg-white/5">{u.full_name}</SelectItem>
+                  <SelectItem value="Unassigned" className="dark:text-zinc-300 dark:hover:bg-white/5">Unassigned</SelectItem>
+                  {Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
+                      <SelectItem key={displayName} value={displayName} className="dark:text-zinc-300 dark:hover:bg-white/5">{displayName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
