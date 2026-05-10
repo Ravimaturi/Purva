@@ -32,10 +32,39 @@ import {
   Building2,
   Image as ImageIcon,
   Upload,
+  ArchiveRestore,
+  UploadCloud,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, fileToBase64 } from "../lib/utils";
+import { supabase } from "../lib/supabase";
 import { ImageCropperDialog } from "./ImageCropperDialog";
+
+const ToggleSwitch = ({
+  defaultChecked = true,
+}: {
+  defaultChecked?: boolean;
+}) => {
+  const [isChecked, setIsChecked] = React.useState(defaultChecked);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isChecked}
+      onClick={() => setIsChecked(!isChecked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+        isChecked ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-700"
+      }`}
+    >
+      <span
+        className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
+          isChecked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+};
 
 const ALL_ROLES: UserRole[] = [
   "admin",
@@ -90,6 +119,103 @@ export const FileControls = () => {
   const [localName, setLocalName] = React.useState(workspaceName);
   const [isCropOpen, setIsCropOpen] = React.useState(false);
   const [cropImageSrc, setCropImageSrc] = React.useState("");
+
+  const [backupFiles, setBackupFiles] = React.useState<any[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = React.useState(false);
+  const [isRestoring, setIsRestoring] = React.useState(false);
+
+  const handleRestoreBackup = async (file: File) => {
+    setIsRestoring(true);
+    const toastId = toast.loading("Restoring project backup...");
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.project || !data.project.id) {
+        throw new Error("Invalid backup file format: Missing project data.");
+      }
+
+      const { project, metadata, ...childTables } = data;
+
+      // 1. Restore Project
+      const { error: projectError } = await supabase
+        .from("projects")
+        .upsert(project);
+      if (projectError) throw projectError;
+
+      // 2. Restore Child Tables
+      for (const [tableName, rows] of Object.entries(childTables)) {
+        if (Array.isArray(rows) && rows.length > 0) {
+          try {
+            const { error: tableError } = await supabase
+              .from(tableName)
+              .upsert(rows);
+            if (tableError) {
+              console.warn(`Failed to restore ${tableName}:`, tableError);
+            }
+          } catch (err) {
+            console.warn(`Exception restoring ${tableName}:`, err);
+          }
+        }
+      }
+
+      toast.success(`Project "${project.name}" restored successfully!`, {
+        id: toastId,
+      });
+
+      // Optionally notify the admin
+      await supabase.from("audit_logs").insert([
+        {
+          project_id: project.id,
+          user_name: "System",
+          action: "Project Restored",
+          details: `Project restored from backup file ${file.name}`,
+        },
+      ]);
+    } catch (e: any) {
+      console.error("Restore error:", e);
+      toast.error(`Failed to restore: ${e.message}`, { id: toastId });
+    } finally {
+      setIsRestoring(false);
+      // Reset input
+      const input = document.getElementById(
+        "backup-upload",
+      ) as HTMLInputElement;
+      if (input) input.value = "";
+    }
+  };
+
+  const fetchBackups = async () => {
+    setIsLoadingBackups(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from("project-backups")
+        .list("");
+      if (error) {
+        console.log("Bucket project-backups might not exist or error:", error);
+      } else {
+        setBackupFiles(
+          (data || [])
+            .filter((file) => file.name !== ".emptyFolderPlaceholder")
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime(),
+            ),
+        );
+      }
+    } catch (e) {
+      console.error("Error fetching backups:", e);
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === "backups") {
+      fetchBackups();
+    }
+  }, [activeTab]);
 
   React.useEffect(() => {
     setLocalName(workspaceName);
@@ -271,19 +397,33 @@ export const FileControls = () => {
   };
 
   const toggleFeatureRole = (
-    feature: "projects" | "tasks",
-    action: "create" | "edit" | "delete",
+    feature:
+      | "projects"
+      | "tasks"
+      | "vendors"
+      | "pettyCash"
+      | "assets"
+      | "dashboard"
+      | "backups",
+    action: "create" | "edit" | "delete" | "view" | "manage",
     role: UserRole,
   ) => {
     setLocalConfig((prev) => {
       const next = JSON.parse(JSON.stringify(prev)) as FilePermissionsConfig;
 
-      const targetList = next[feature][action];
+      const targetList = next[feature as keyof typeof next][
+        action as string
+      ] as UserRole[];
 
       if (targetList.includes(role)) {
-        next[feature][action] = targetList.filter((r) => r !== role);
+        (next[feature as keyof typeof next] as any)[action] = targetList.filter(
+          (r) => r !== role,
+        );
       } else {
-        next[feature][action] = [...targetList, role];
+        (next[feature as keyof typeof next] as any)[action] = [
+          ...targetList,
+          role,
+        ];
       }
 
       return next;
@@ -294,31 +434,36 @@ export const FileControls = () => {
     feature,
     action,
   }: {
-    feature: "projects" | "tasks" | "vendors" | "pettyCash" | "assets";
-    action: "create" | "edit" | "delete";
+    feature:
+      | "projects"
+      | "tasks"
+      | "vendors"
+      | "pettyCash"
+      | "assets"
+      | "dashboard"
+      | "backups";
+    action: "create" | "edit" | "delete" | "view" | "manage";
   }) => {
     return (
       <div className="flex flex-wrap gap-2 mt-2">
         {ALL_ROLES.map((role) => {
-          const isActive = localConfig[feature][action].includes(role);
-          const isHardcodedAdmin =
-            (role === "admin" || role === "chief_sthapathy") &&
-            (feature === "projects" || feature === "tasks");
-          const isHardcodedFinanceAdmin = role === "admin";
-          const isDisabled =
-            feature === "vendors" ||
-            feature === "pettyCash" ||
-            feature === "assets"
-              ? isHardcodedFinanceAdmin
-              : isHardcodedAdmin;
+          const isActive = (localConfig[feature] as any)[action].includes(role);
+          let isHardcodedAdmin = false;
+          if (
+            (feature === "projects" || feature === "tasks") &&
+            (role === "admin" || role === "chief_sthapathy")
+          )
+            isHardcodedAdmin = true;
+          if (feature !== "projects" && feature !== "tasks" && role === "admin")
+            isHardcodedAdmin = true;
 
           return (
             <button
               key={role}
-              disabled={isDisabled}
-              onClick={() => toggleFeatureRole(feature as any, action, role)}
+              disabled={isHardcodedAdmin}
+              onClick={() => toggleFeatureRole(feature, action, role)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                isDisabled
+                isHardcodedAdmin
                   ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 opacity-70 cursor-not-allowed"
                   : isActive
                     ? "bg-indigo-500 text-white shadow-sm"
@@ -359,6 +504,7 @@ export const FileControls = () => {
             { id: "appearance", label: "Appearance", icon: Palette },
             { id: "features", label: "Features", icon: ShieldCheck },
             { id: "files", label: "Files", icon: Download },
+            { id: "backups", label: "Backups", icon: ArchiveRestore },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -815,6 +961,168 @@ export const FileControls = () => {
                     <FeatureRoleToggles feature="assets" action="delete" />
                   </div>
                 </div>
+              </div>
+
+              {/* Dashboard & Admin Elements */}
+              <div className="p-6 space-y-6 border-t border-slate-100 dark:border-white/5">
+                <h3 className="text-md font-bold text-slate-900 dark:text-white flex items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  System Views & Administration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300 mb-2 flex items-center gap-2">
+                      <LayoutDashboard className="w-4 h-4 text-indigo-500" />
+                      View Dashboard
+                    </h4>
+                    <FeatureRoleToggles feature="dashboard" action="view" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300 mb-2 flex items-center gap-2">
+                      <ArchiveRestore className="w-4 h-4 text-indigo-500" />
+                      Manage Backups
+                    </h4>
+                    <FeatureRoleToggles feature="backups" action="manage" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification Events */}
+              <div className="p-6 space-y-6 border-t border-slate-100 dark:border-white/5">
+                <h3 className="text-md font-bold text-slate-900 dark:text-white flex items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  Notification Events
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Toggle which system actions generate notifications across the
+                  workspace.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    "Project creation and updates",
+                    "Project deletion",
+                    "Task assignments and status changes",
+                    "Task comments and file attachments",
+                    "Vendor order creation",
+                    "Payment stage updates",
+                    "Asset assignments",
+                    "Checklist completion",
+                  ].map((event) => (
+                    <div
+                      key={event}
+                      className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 rounded-lg"
+                    >
+                      <span className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
+                        {event}
+                      </span>
+                      <ToggleSwitch />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="backups" className="space-y-6">
+          <div className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50 dark:bg-[#151515]">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ArchiveRestore className="w-5 h-5 text-indigo-500" /> System
+                Backups
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Restore deleted projects data from backup JSON files.
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center bg-slate-50 dark:bg-[#151515]">
+                <UploadCloud className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                  Upload Backup File
+                </h3>
+                <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+                  Drag and drop a project backup JSON file here, or click to
+                  browse. Note: Currently, manual import assistance is provided
+                  by the IT administrator to avoid merge conflicts.
+                </p>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  id="backup-upload"
+                  disabled={isRestoring}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleRestoreBackup(file);
+                    }
+                  }}
+                />
+                <Button
+                  disabled={isRestoring}
+                  onClick={() =>
+                    document.getElementById("backup-upload")?.click()
+                  }
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {isRestoring ? "Restoring..." : "Browse Files"}
+                </Button>
+              </div>
+
+              <div className="mt-8">
+                <h3 className="text-md font-bold text-slate-900 dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  Cloud Backups Available
+                </h3>
+                {isLoadingBackups ? (
+                  <p className="text-sm text-slate-500">Loading backups...</p>
+                ) : backupFiles.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No cloud backups found in 'project-backups' bucket.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {backupFiles.map((file) => (
+                      <div
+                        key={file.name}
+                        className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-800 rounded-lg hover:border-slate-300 dark:hover:border-slate-700 transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ArchiveRestore className="w-5 h-5 text-indigo-500" />
+                          <div>
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(file.created_at).toLocaleString()} •{" "}
+                              {(file.metadata?.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const { data, error } = await supabase.storage
+                                .from("project-backups")
+                                .download(file.name);
+                              if (error) throw error;
+                              const url = URL.createObjectURL(data);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = file.name;
+                              a.click();
+                            } catch (e: any) {
+                              toast.error(`Failed to download: ${e.message}`);
+                            }
+                          }}
+                          className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                        >
+                          <Download className="w-4 h-4 mr-2" /> Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

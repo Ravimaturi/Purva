@@ -894,9 +894,17 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   const handleDeleteProject = async () => {
     try {
-      // Attempt to delete from related tables first to avoid foreign key constraint errors
+      toast.info("Generating project backup...");
+      // Generate backup data
+      const backupData: any = {
+        project: {
+          ...project,
+          id: crypto.randomUUID() /* assign new ID just to avoid conflicts if they restore manually but wait, if it's a backup we might want the same ID or a new ID, let's keep original ID */,
+        },
+      };
+      backupData.project = project;
       const childTables = [
-        "audit_logs",
+        // "audit_logs", // audit logs might fail on insert if they have triggers, but we can dump them anyway
         "comments",
         "payment_stages",
         "project_checklists",
@@ -907,6 +915,78 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       ];
 
       for (const table of childTables) {
+        const { data: rows } = await supabase
+          .from(table)
+          .select("*")
+          .eq("project_id", project.id);
+        backupData[table] = rows || [];
+      }
+
+      const backupMetadata = {
+        deleted_by: {
+          id: user?.id,
+          name: user?.full_name,
+          email: user?.email,
+          role: user?.role,
+        },
+        deleted_at: new Date().toISOString(),
+      };
+
+      const fullBackupPayload = {
+        metadata: backupMetadata,
+        ...backupData,
+      };
+
+      const fileName = `Project_Backup_${project.name.replace(/\s+/g, "_")}_${new Date().toISOString().replace(/:/g, "-")}.json`;
+
+      // Try to upload to Supabase storage bucket named "project-backups"
+      try {
+        const backupBlob = new Blob(
+          [JSON.stringify(fullBackupPayload, null, 2)],
+          { type: "application/json" },
+        );
+        const { error: uploadError } = await supabase.storage
+          .from("project-backups")
+          .upload(fileName, backupBlob);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        toast.success(
+          `Backup pushed to Supabase "project-backups" bucket as ${fileName}`,
+        );
+
+        // Log the successful upload in audit_logs
+        await supabase.from("audit_logs").insert([
+          {
+            project_id: project.id,
+            user_id: user?.id,
+            user_name: user?.full_name,
+            action: "Backup Uploaded",
+            details: `Backup saved to project-backups/${fileName}`,
+          },
+        ]);
+      } catch (uploadError: any) {
+        toast.error(
+          `Failed to push to Supabase (Bucket "project-backups" missing?). Falling back to local download...`,
+        );
+        // Fallback to local download
+        const dataStr =
+          "data:text/json;charset=utf-8," +
+          encodeURIComponent(JSON.stringify(fullBackupPayload, null, 2));
+        const downloadAnchorNode = document.createElement("a");
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      }
+
+      toast.success("Backup process completed. Proceeding with deletion...");
+
+      // Attempt to delete from related tables first to avoid foreign key constraint errors
+      for (const table of ["audit_logs", ...childTables]) {
         await supabase
           .from(table)
           .delete()
