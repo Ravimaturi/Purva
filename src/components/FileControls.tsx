@@ -18,7 +18,6 @@ import { Input } from "./ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import {
   ShieldCheck,
-  Save,
   Trash2,
   Plus,
   Download,
@@ -269,19 +268,13 @@ export const FileControls = () => {
     );
   }
 
-  const handleSave = async () => {
-    await updateConfig(localConfig);
-    toast.success("Settings synced successfully across devices.");
-  };
-
   const toggleRole = (
     type: "default" | "override",
     action: "view" | "download",
     role: UserRole,
     ext?: string,
   ) => {
-    setLocalConfig((prev) => {
-      const next = JSON.parse(JSON.stringify(prev)) as FilePermissionsConfig;
+      const next = JSON.parse(JSON.stringify(localConfig)) as FilePermissionsConfig;
 
       let targetList: UserRole[] = [];
       if (type === "default") {
@@ -310,8 +303,8 @@ export const FileControls = () => {
         }
       }
 
-      return next;
-    });
+      setLocalConfig(next);
+      updateConfig(next);
   };
 
   const activeRolesObj = (
@@ -373,27 +366,31 @@ export const FileControls = () => {
       return;
     }
 
-    setLocalConfig((prev) => ({
-      ...prev,
-      extensionOverrides: {
-        ...prev.extensionOverrides,
-        [ext]: {
-          view: [...prev.defaultPermissions.view],
-          download: [...prev.defaultPermissions.download],
+      const next = {
+        ...localConfig,
+        extensionOverrides: {
+          ...localConfig.extensionOverrides,
+          [ext]: {
+            view: [...localConfig.defaultPermissions.view],
+            download: [...localConfig.defaultPermissions.download],
+          },
         },
-      },
-    }));
+      };
+
+      setLocalConfig(next);
+      updateConfig(next);
     setNewExt("");
+    toast.success(`Override added for .${ext}`);
   };
 
   const handleRemoveOverride = (ext: string) => {
-    setLocalConfig((prev) => {
-      const next = { ...prev };
+      const next = { ...localConfig };
       const overrides = { ...next.extensionOverrides };
       delete overrides[ext];
       next.extensionOverrides = overrides;
-      return next;
-    });
+      setLocalConfig(next);
+      updateConfig(next);
+    toast.success(`Override removed for .${ext}`);
   };
 
   const toggleFeatureRole = (
@@ -408,8 +405,7 @@ export const FileControls = () => {
     action: "create" | "edit" | "delete" | "view" | "manage",
     role: UserRole,
   ) => {
-    setLocalConfig((prev) => {
-      const next = JSON.parse(JSON.stringify(prev)) as FilePermissionsConfig;
+      const next = JSON.parse(JSON.stringify(localConfig)) as FilePermissionsConfig;
 
       const targetList = next[feature as keyof typeof next][
         action as string
@@ -426,8 +422,8 @@ export const FileControls = () => {
         ];
       }
 
-      return next;
-    });
+      setLocalConfig(next);
+      updateConfig(next);
   };
 
   const FeatureRoleToggles = ({
@@ -490,12 +486,6 @@ export const FileControls = () => {
             Manage global app settings, features, and file permissions
           </p>
         </div>
-        <Button
-          onClick={handleSave}
-          className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 font-bold text-white shadow-lg"
-        >
-          <Save className="w-4 h-4 mr-2" /> Save Settings
-        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

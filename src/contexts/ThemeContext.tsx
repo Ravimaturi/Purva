@@ -138,6 +138,33 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
     loadWorkspaceSettings();
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session) loadWorkspaceSettings();
+      }
+    });
+
+    const channel = supabase
+      .channel('public:workspace_settings:theme')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_settings' }, (payload) => {
+         const newData = payload.new as any;
+         if (newData) {
+           if (newData.workspace_name) setWorkspaceNameState(prev => prev !== newData.workspace_name ? newData.workspace_name : prev);
+           if (newData.logo_url !== undefined) setWorkspaceLogoState(prev => prev !== newData.logo_url ? newData.logo_url : prev);
+           if (newData.full_logo_url !== undefined) setWorkspaceLogoFullState(prev => prev !== newData.full_logo_url ? newData.full_logo_url : prev);
+           if (newData.accent_color) setAccentColor(prev => prev !== newData.accent_color ? newData.accent_color as AccentColor : prev);
+           if (newData.dashboard_style) setDashboardStyle(prev => prev !== newData.dashboard_style ? newData.dashboard_style as DashboardStyle : prev);
+           if (newData.is_colorful !== null) setIsColorful(prev => prev !== newData.is_colorful ? newData.is_colorful : prev);
+           if (newData.theme_mode) setThemeMode(prev => prev !== newData.theme_mode ? newData.theme_mode as ThemeMode : prev);
+         }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      authSub.unsubscribe();
+    };
   }, []);
 
   const setWorkspaceName = async (name: string) => {

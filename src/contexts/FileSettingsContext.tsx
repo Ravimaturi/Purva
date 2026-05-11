@@ -235,6 +235,43 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
       }
     };
     fetchConfig();
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session) fetchConfig();
+      }
+    });
+
+    const channel = supabase
+      .channel('public:workspace_settings:files')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_settings' }, (payload) => {
+         const newData = payload.new as any;
+         if (newData && newData.file_permissions_config) {
+           try {
+             const parsed = typeof newData.file_permissions_config === "string" 
+                ? JSON.parse(newData.file_permissions_config) 
+                : newData.file_permissions_config;
+             setConfig((prev) => ({
+                ...prev,
+                defaultPermissions: parsed.defaultPermissions || DEFAULT_CONFIG.defaultPermissions,
+                extensionOverrides: parsed.extensionOverrides || DEFAULT_CONFIG.extensionOverrides,
+                projects: parsed.projects || DEFAULT_CONFIG.projects,
+                tasks: parsed.tasks || DEFAULT_CONFIG.tasks,
+                vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
+                pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
+                assets: parsed.assets || DEFAULT_CONFIG.assets,
+                dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
+                backups: parsed.backups || DEFAULT_CONFIG.backups,
+             }));
+           } catch(err) {}
+         }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      authSub.unsubscribe();
+    };
   }, []);
 
   const updateConfig = async (newConfig: FilePermissionsConfig) => {
