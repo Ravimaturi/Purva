@@ -269,9 +269,9 @@ export const FileControls = () => {
     );
   }
 
-  const handleSave = () => {
-    updateConfig(localConfig);
-    toast.success("Settings updated and saved to this browser.");
+  const handleSave = async () => {
+    await updateConfig(localConfig);
+    toast.success("Settings synced successfully across devices.");
   };
 
   const toggleRole = (

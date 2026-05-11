@@ -198,9 +198,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ open, onOpen
                 onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
               >
                 <SelectTrigger className="rounded-xl border-slate-200 dark:border-white/10 dark:bg-[#181818] dark:text-zinc-100">
-                  <SelectValue />
+                  <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl dark:bg-[#181818] dark:border-white/10">
+                <SelectContent className="rounded-xl dark:bg-[#181818] dark:border-white/10 z-[300]">
                   <SelectItem value="Unassigned" className="dark:text-zinc-300 dark:hover:bg-white/5">Unassigned</SelectItem>
                   {Array.from(new Set(allUsers.map(u => u.full_name || u.email || 'Unnamed User'))).map(displayName => (
                       <SelectItem key={displayName} value={displayName} className="dark:text-zinc-300 dark:hover:bg-white/5">{displayName}</SelectItem>

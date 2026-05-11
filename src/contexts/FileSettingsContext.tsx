@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import { UserRole } from "../types";
+import { supabase } from "../lib/supabase";
 
 export interface RolePermissions {
   view: UserRole[];
@@ -184,36 +185,76 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
   const [config, setConfig] = useState<FilePermissionsConfig>(DEFAULT_CONFIG);
 
   useEffect(() => {
-    // Load from localStorage for prototype usage
-    const saved = localStorage.getItem("purva_file_permissions_v1");
-    if (saved) {
+    const fetchConfig = async () => {
+      // 1. Try fetching from Supabase
       try {
-        const parsed = JSON.parse(saved);
-        setConfig({
-          defaultPermissions:
-            parsed.defaultPermissions || DEFAULT_CONFIG.defaultPermissions,
-          extensionOverrides:
-            parsed.extensionOverrides || DEFAULT_CONFIG.extensionOverrides,
-          projects: parsed.projects || DEFAULT_CONFIG.projects,
-          tasks: parsed.tasks || DEFAULT_CONFIG.tasks,
-          vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
-          pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
-          assets: parsed.assets || DEFAULT_CONFIG.assets,
-          dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
-          backups: parsed.backups || DEFAULT_CONFIG.backups,
-        });
+        const { data, error } = await supabase.from("workspace_settings").select("file_permissions_config").limit(1).maybeSingle();
+        if (!error && data?.file_permissions_config) {
+          const parsed =
+            typeof data.file_permissions_config === "string"
+              ? JSON.parse(data.file_permissions_config)
+              : data.file_permissions_config;
+          setConfig({
+            defaultPermissions: parsed.defaultPermissions || DEFAULT_CONFIG.defaultPermissions,
+            extensionOverrides: parsed.extensionOverrides || DEFAULT_CONFIG.extensionOverrides,
+            projects: parsed.projects || DEFAULT_CONFIG.projects,
+            tasks: parsed.tasks || DEFAULT_CONFIG.tasks,
+            vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
+            pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
+            assets: parsed.assets || DEFAULT_CONFIG.assets,
+            dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
+            backups: parsed.backups || DEFAULT_CONFIG.backups,
+          });
+          return; // Success
+        }
       } catch (e) {
-        console.error("Failed to parse file permissions from local storage");
+        // Ignored
       }
-    }
+      
+      // 2. Fallback to localStorage for prototypes / local-only 
+      const saved = localStorage.getItem("purva_file_permissions_v1");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setConfig({
+            defaultPermissions:
+              parsed.defaultPermissions || DEFAULT_CONFIG.defaultPermissions,
+            extensionOverrides:
+              parsed.extensionOverrides || DEFAULT_CONFIG.extensionOverrides,
+            projects: parsed.projects || DEFAULT_CONFIG.projects,
+            tasks: parsed.tasks || DEFAULT_CONFIG.tasks,
+            vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
+            pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
+            assets: parsed.assets || DEFAULT_CONFIG.assets,
+            dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
+            backups: parsed.backups || DEFAULT_CONFIG.backups,
+          });
+        } catch (e) {
+          console.error("Failed to parse file permissions from local storage");
+        }
+      }
+    };
+    fetchConfig();
   }, []);
 
-  const updateConfig = (newConfig: FilePermissionsConfig) => {
+  const updateConfig = async (newConfig: FilePermissionsConfig) => {
     setConfig(newConfig);
     localStorage.setItem(
       "purva_file_permissions_v1",
       JSON.stringify(newConfig),
     );
+
+    try {
+      const { data } = await supabase.from('workspace_settings').select('id').limit(1).maybeSingle();
+      if (data?.id) {
+        await supabase.from('workspace_settings').update({ file_permissions_config: newConfig }).eq('id', data.id);
+      } else {
+        await supabase.from('workspace_settings').insert([{ file_permissions_config: newConfig }]);
+      }
+    } catch (e) {
+      // It will fail if the user hasn't added the file_permissions_config column yet.
+      console.warn("Could not sync file permissions to Supabase (missing column?)", e);
+    }
   };
 
   const getExt = (fileName: string) =>

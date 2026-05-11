@@ -75,6 +75,9 @@ CREATE POLICY "Admins can delete profiles" ON public.profiles
   );
 
 
+-- 5. WORKSPACE SETTINGS
+-- Add the file_permissions_config JSONB column
+ALTER TABLE public.workspace_settings ADD COLUMN IF NOT EXISTS file_permissions_config JSONB;
 -- 4. FIX PROJECT DELETION PERMISSIONS
 -- Make sure Admins and other roles can actually delete resources
 DO $$
