@@ -37,6 +37,8 @@ interface PettyCashEntry {
   expenditure_amount: number;
   raised_by_id: string;
   raised_by_name: string;
+  entered_by_id?: string;
+  entered_by_name?: string;
   created_at: string;
   receipt_url?: string;
 }
@@ -177,9 +179,9 @@ export const PettyCash = () => {
       // Limit slightly just in case the date range selected is massive
       query = query.limit(3000);
       
-      // If not admin, restrict to own entries
+      // If not admin, restrict to own entries or entries this user entered
       if (!isAdmin && user?.id) {
-        query = query.eq('raised_by_id', user.id);
+        query = query.or(`raised_by_id.eq.${user.id},entered_by_id.eq.${user.id}`);
       }
 
       const { data, error } = await query;
@@ -296,7 +298,7 @@ export const PettyCash = () => {
           expenditure_amount: exp
         };
         
-        if (isAdmin && form.raised_by_id && form.raised_by_id !== '') {
+        if (form.raised_by_id && form.raised_by_id !== '') {
           const selectedUser = allUsers?.find(u => u.id === form.raised_by_id);
           if (selectedUser) {
             updatePayload.raised_by_id = selectedUser.id;
@@ -332,8 +334,18 @@ export const PettyCash = () => {
           advance_amount: adv,
           expenditure_amount: exp,
           raised_by_id: user.id,
-          raised_by_name: user.full_name
+          raised_by_name: user.full_name,
+          entered_by_id: user.id,
+          entered_by_name: user.full_name,
         };
+        
+        if (form.raised_by_id && form.raised_by_id !== '') {
+          const selectedUser = allUsers?.find(u => u.id === form.raised_by_id);
+          if (selectedUser) {
+            newEntry.raised_by_id = selectedUser.id;
+            newEntry.raised_by_name = selectedUser.full_name;
+          }
+        }
         
         if (finalReceiptUrl) newEntry.receipt_url = finalReceiptUrl;
 
@@ -534,12 +546,11 @@ export const PettyCash = () => {
                 </select>
               </div>
 
-              {isAdmin && editingId && (
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Reassign To (Admin Only)</label>
+              <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Paid By (Expense Owner)</label>
                   <select 
                     name="raised_by_id"
-                    value={form.raised_by_id || ''}
+                    value={form.raised_by_id || user?.id || ''}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white h-10"
                   >
@@ -547,7 +558,6 @@ export const PettyCash = () => {
                     {allUsers?.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
                   </select>
                 </div>
-              )}
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Project Name</label>
@@ -826,8 +836,7 @@ export const PettyCash = () => {
                     </select>
                   </div>
 
-                  {isAdmin && (
-                    <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center">
                          User
                       </label>
@@ -840,7 +849,6 @@ export const PettyCash = () => {
                         {uniqueUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                       </select>
                     </div>
-                  )}
 
                   <div className="space-y-1.5 pt-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center">
@@ -983,7 +991,7 @@ export const PettyCash = () => {
                         <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                           <td className="p-4 text-sm text-slate-600 dark:text-zinc-400 whitespace-nowrap align-top">
                             {e.date}
-                            {isAdmin && (
+                            {e.raised_by_name && (
                               <div className="mt-1 text-xs opacity-70 flex items-center text-indigo-600 dark:text-indigo-400 font-medium">
                                 <UserIcon className="w-3 h-3 mr-1" />
                                 {e.raised_by_name?.split(' ')[0]}
@@ -1036,7 +1044,7 @@ export const PettyCash = () => {
                             ) : '-'}
                           </td>
                           <td className="p-4 align-top text-right w-[60px]">
-                            {(isAdmin || e.raised_by_id === user?.id) && (
+                            {(isAdmin || e.raised_by_id === user?.id || e.entered_by_id === user?.id) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
