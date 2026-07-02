@@ -4,11 +4,13 @@ import { loginRequest } from '../lib/msalConfig';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
 import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { exportPettyCashToWord } from '../lib/exportToWord';
 import {
   BarChart,
   Bar,
@@ -45,6 +47,7 @@ interface PettyCashEntry {
 
 export const PettyCash = () => {
   const { user, allUsers } = useUser();
+  const { addNotification } = useNotifications();
   const { canManagePettyCash } = useFileSettings();
   const isAdmin = canManagePettyCash(user?.role, 'edit') || hasAdminAccess(user?.role);
   const canCreate = canManagePettyCash(user?.role, 'create');
@@ -102,10 +105,24 @@ export const PettyCash = () => {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await exportPettyCashToWord(filteredEntries);
+      toast.success('Export completed successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export to Word');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     fetchQueries();
@@ -355,6 +372,15 @@ export const PettyCash = () => {
         if (data) {
           setEntries([data[0], ...entries]);
           toast.success("Petty Cash entry added successfully!");
+          
+          // Add notification for admins/chief_sthapathy
+          const expAmt = data[0].expenditure_amount ? `Rs. ${data[0].expenditure_amount}` : '';
+          const advAmt = data[0].advance_amount ? `Rs. ${data[0].advance_amount}` : '';
+          const amtStr = expAmt ? `Expense: ${expAmt}` : (advAmt ? `Advance: ${advAmt}` : '');
+          const notificationTitle = `New Petty Cash Entry: ${data[0].bill_name || data[0].category}`;
+          const notificationMessage = `${amtStr} | Reason: ${data[0].reason || 'N/A'} | Paid By: ${data[0].raised_by_name || 'N/A'}`;
+          
+          await addNotification(notificationTitle, notificationMessage);
         }
 
         if (addAnother) {
@@ -497,20 +523,31 @@ export const PettyCash = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Petty Cash Tracking</h1>
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
-        {(canCreate || showForm) && (
-          <Button onClick={() => {
-            if (showForm) {
-              setShowForm(false);
-              setEditingId(null);
-              setForm(emptyForm);
-            } else {
-              setShowForm(true);
-            }
-          }} className="mt-4 sm:mt-0 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
-            {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-            {showForm ? 'Cancel Form' : 'New Entry'}
+        <div className="flex items-center gap-3 mt-4 sm:mt-0">
+          <Button 
+            onClick={handleExport} 
+            disabled={isExporting || filteredEntries.length === 0}
+            variant="outline" 
+            className="font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+          >
+            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            Export to Word
           </Button>
-        )}
+          {(canCreate || showForm) && (
+            <Button onClick={() => {
+              if (showForm) {
+                setShowForm(false);
+                setEditingId(null);
+                setForm(emptyForm);
+              } else {
+                setShowForm(true);
+              }
+            }} className="bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
+              {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              {showForm ? 'Cancel Form' : 'New Entry'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {showForm ? (
@@ -561,18 +598,15 @@ export const PettyCash = () => {
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Project Name</label>
-                <input 
-                  type="text" 
-                  list="projectList"
+                <select 
                   name="project_name"
                   value={form.project_name}
                   onChange={handleInputChange}
-                  placeholder="Select existing or type a custom project name"
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white"
-                />
-                <datalist id="projectList">
-                  {projects.map(p => <option key={p.id} value={p.name} />)}
-                </datalist>
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-white h-10"
+                >
+                  <option value="">Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
               </div>
 
               <div className="space-y-2 md:col-span-2">

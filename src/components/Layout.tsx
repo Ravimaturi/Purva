@@ -95,6 +95,7 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
+        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "vendors", label: t("vendors"), icon: Building2 },
         { id: "team", label: t("team"), icon: UsersIcon },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
@@ -106,6 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
+        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "vendors", label: t("vendors"), icon: Building2 },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
         { id: "assets", label: "Assets", icon: Briefcase },
@@ -122,6 +124,7 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
+        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
       ];
     }
@@ -427,7 +430,10 @@ export const Layout: React.FC<LayoutProps> = ({
                 <div className="max-h-[400px] overflow-y-auto">
                   {notifications.length > 0 ? (
                     <div className="divide-y divide-slate-50">
-                      {notifications.map((n) => (
+                      {notifications
+                        .filter((n) => !n.read)
+                        .concat(notifications.filter((n) => n.read).slice(0, 10))
+                        .map((n) => (
                         <div
                           key={n.id}
                           className={cn(

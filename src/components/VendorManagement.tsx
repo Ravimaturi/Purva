@@ -4,7 +4,7 @@ import { Vendor, VendorOrder, Project, hasFinanceAccess, hasProjectManagementAcc
 import { useLanguage } from '../contexts/LanguageContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { useUser } from '../contexts/UserContext';
-import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Briefcase, FileText, DollarSign, ExternalLink, Edit, Trash2, Mail, Landmark } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -50,9 +50,14 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
   const [newVendorName, setNewVendorName] = useState('');
   const [newContactPersonName, setNewContactPersonName] = useState('');
   const [newPhoneNo, setNewPhoneNo] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newPanCardNo, setNewPanCardNo] = useState('');
   const [newGstNo, setNewGstNo] = useState('');
   const [newServicesList, setNewServicesList] = useState('');
+  const [newBankAccountName, setNewBankAccountName] = useState('');
+  const [newBankAccountNumber, setNewBankAccountNumber] = useState('');
+  const [newBankIfsc, setNewBankIfsc] = useState('');
+  const [newBankName, setNewBankName] = useState('');
 
   const handleAddVendor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,9 +65,14 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
       vendor_name: newVendorName,
       contact_person_name: newContactPersonName,
       phone_no: newPhoneNo,
+      email: newEmail,
       pan_card_no: newPanCardNo,
       gst_no: newGstNo,
       services_list: newServicesList,
+      bank_account_name: newBankAccountName,
+      bank_account_number: newBankAccountNumber,
+      bank_ifsc: newBankIfsc,
+      bank_name: newBankName
     };
     
     const { data, error } = await supabase.from('vendors').insert([newVendor]).select();
@@ -79,9 +89,14 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
       setNewVendorName('');
       setNewContactPersonName('');
       setNewPhoneNo('');
+      setNewEmail('');
       setNewPanCardNo('');
       setNewGstNo('');
       setNewServicesList('');
+      setNewBankAccountName('');
+      setNewBankAccountNumber('');
+      setNewBankIfsc('');
+      setNewBankName('');
       toast.success('Vendor added successfully');
     }
   };
@@ -91,9 +106,14 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
     setNewVendorName(vendor.vendor_name);
     setNewContactPersonName(vendor.contact_person_name || '');
     setNewPhoneNo(vendor.phone_no || '');
+    setNewEmail(vendor.email || '');
     setNewPanCardNo(vendor.pan_card_no || '');
     setNewGstNo(vendor.gst_no || '');
     setNewServicesList(vendor.services_list || '');
+    setNewBankAccountName(vendor.bank_account_name || '');
+    setNewBankAccountNumber(vendor.bank_account_number || '');
+    setNewBankIfsc(vendor.bank_ifsc || '');
+    setNewBankName(vendor.bank_name || '');
     setIsEditVendorOpen(true);
   };
 
@@ -105,9 +125,14 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
       vendor_name: newVendorName,
       contact_person_name: newContactPersonName,
       phone_no: newPhoneNo,
+      email: newEmail,
       pan_card_no: newPanCardNo,
       gst_no: newGstNo,
       services_list: newServicesList,
+      bank_account_name: newBankAccountName,
+      bank_account_number: newBankAccountNumber,
+      bank_ifsc: newBankIfsc,
+      bank_name: newBankName
     };
     
     const { error } = await supabase
@@ -235,13 +260,33 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                   <Phone className="w-4 h-4 text-slate-400" />
                   {vendor.phone_no} {vendor.contact_person_name ? `(${vendor.contact_person_name})` : ''}
                 </div>
+                {vendor.email && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
+                    <Mail className="w-4 h-4 text-slate-400" />
+                    <a href={`mailto:${vendor.email}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{vendor.email}</a>
+                  </div>
+                )}
                 {(vendor.pan_card_no || vendor.gst_no) && (
                   <div className="flex flex-col gap-1 text-xs text-slate-500 dark:text-zinc-500">
                     {vendor.pan_card_no && <span>PAN: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.pan_card_no}</span></span>}
                     {vendor.gst_no && <span>GST: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.gst_no}</span></span>}
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
+                {(vendor.bank_name || vendor.bank_account_number || vendor.bank_ifsc || vendor.bank_account_name) && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
+                      <Landmark className="w-4 h-4 text-slate-400" />
+                      Bank Details
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-zinc-500">
+                      {vendor.bank_name && <div className="col-span-2">Bank: <span className="text-slate-700 dark:text-zinc-300 font-medium">{vendor.bank_name}</span></div>}
+                      {vendor.bank_account_name && <div className="col-span-2">Name: <span className="text-slate-700 dark:text-zinc-300 font-medium">{vendor.bank_account_name}</span></div>}
+                      {vendor.bank_account_number && <div>A/C: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.bank_account_number}</span></div>}
+                      {vendor.bank_ifsc && <div>IFSC: <span className="font-mono text-slate-700 dark:text-zinc-300">{vendor.bank_ifsc}</span></div>}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400 pt-2">
                   <Briefcase className="w-4 h-4 text-slate-400" />
                   {vendorOrders.length} Orders
                 </div>
@@ -308,8 +353,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                 placeholder="e.g. ABC Construction Supplies"
               />
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Contact Person</label>
                 <Input 
@@ -329,6 +373,17 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                   placeholder="Phone Number"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Email Address</label>
+              <Input 
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="rounded-xl"
+                placeholder="vendor@example.com"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -362,6 +417,53 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                 placeholder="e.g. Cement, Steel, Labor"
               />
             </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Bank Details</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Bank Name</label>
+                  <Input 
+                    value={newBankName}
+                    onChange={(e) => setNewBankName(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="e.g. HDFC Bank"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">IFSC Code</label>
+                  <Input 
+                    value={newBankIfsc}
+                    onChange={(e) => setNewBankIfsc(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="e.g. HDFC0001234"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account Name</label>
+                  <Input 
+                    value={newBankAccountName}
+                    onChange={(e) => setNewBankAccountName(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Name on Account"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account Number</label>
+                  <Input 
+                    value={newBankAccountNumber}
+                    onChange={(e) => setNewBankAccountNumber(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Account Number"
+                  />
+                </div>
+              </div>
+            </div>
+
             <DialogFooter className="mt-6">
               <Button type="button" variant="ghost" onClick={() => setIsAddVendorOpen(false)} className="rounded-xl">Cancel</Button>
               <Button type="submit" className="bg-indigo-600 rounded-xl">Add Vendor</Button>
@@ -386,8 +488,7 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                 placeholder="e.g. ABC Construction Supplies"
               />
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Contact Person</label>
                 <Input 
@@ -407,6 +508,17 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                   placeholder="Phone Number"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Email Address</label>
+              <Input 
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="rounded-xl"
+                placeholder="vendor@example.com"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -440,6 +552,53 @@ export const VendorManagement: React.FC<VendorManagementProps> = ({ onProjectCli
                 placeholder="e.g. Cement, Steel, Labor"
               />
             </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Bank Details</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Bank Name</label>
+                  <Input 
+                    value={newBankName}
+                    onChange={(e) => setNewBankName(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="e.g. HDFC Bank"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">IFSC Code</label>
+                  <Input 
+                    value={newBankIfsc}
+                    onChange={(e) => setNewBankIfsc(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="e.g. HDFC0001234"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account Name</label>
+                  <Input 
+                    value={newBankAccountName}
+                    onChange={(e) => setNewBankAccountName(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Name on Account"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account Number</label>
+                  <Input 
+                    value={newBankAccountNumber}
+                    onChange={(e) => setNewBankAccountNumber(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Account Number"
+                  />
+                </div>
+              </div>
+            </div>
+
             <DialogFooter className="mt-6">
               <Button type="button" variant="ghost" onClick={() => setIsEditVendorOpen(false)} className="rounded-xl">Cancel</Button>
               <Button type="submit" className="bg-indigo-600 rounded-xl">Save Changes</Button>

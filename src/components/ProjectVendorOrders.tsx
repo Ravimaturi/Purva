@@ -46,6 +46,8 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
   const [comments, setComments] = useState('');
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [orderToManage, setOrderToManage] = useState<VendorOrder | null>(null);
+  const [isManageHistoryOpen, setIsManageHistoryOpen] = useState(false);
 
   const projectOrders = orders.filter(o => o.project_id === project.id);
 
@@ -208,15 +210,22 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
                 </div>
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-50 dark:border-white/5">
-                <PaymentStageHistory 
-                  commentsJson={order.comments} 
-                  onUpdate={(newCommentsJson) => updateOrderComments(order.id, newCommentsJson)} 
-                  onReceiptAdded={(amount, date) => {
-                    const newAmount = order.amount_paid + amount;
-                    updateOrderAmountPaid(order.id, newAmount);
-                  }}
-                />
+              <div className="pt-4 mt-4 flex items-center justify-between border-t border-slate-50 dark:border-white/5">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Manage order history</span>
+                </div>
+                <Button 
+                  onClick={() => {
+                    setOrderToManage(order);
+                    setIsManageHistoryOpen(true);
+                  }} 
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900/50 dark:text-indigo-400 dark:hover:bg-indigo-950/30"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Receipts & Comments
+                </Button>
               </div>
             </div>
           );
@@ -237,11 +246,13 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
           </DialogHeader>
           <form onSubmit={handleAdd} className="space-y-4 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2 min-w-0">
+              <div className="space-y-2 min-w-0" key={vendors.length ? 'loaded' : 'loading'}>
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Vendor</label>
                 <Select required value={vendorId} onValueChange={setVendorId}>
                   <SelectTrigger className="rounded-xl w-full truncate">
-                    <SelectValue placeholder="Select a vendor" />
+                    <SelectValue placeholder="Select a vendor">
+                      {vendors.find(v => v.id === vendorId)?.vendor_name || 'Select a vendor'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {vendors.map(v => (
@@ -291,6 +302,27 @@ export const ProjectVendorOrders: React.FC<Props> = ({ project }) => {
               <Button type="submit" className="bg-indigo-600 rounded-xl" disabled={!vendorId}>Add Order</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isManageHistoryOpen} onOpenChange={setIsManageHistoryOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Order History: {vendors.find(v => v.id === orderToManage?.vendor_id)?.vendor_name}</DialogTitle>
+          </DialogHeader>
+          {orderToManage && (
+            <div className="mt-2">
+              <PaymentStageHistory 
+                commentsJson={orderToManage.comments} 
+                onUpdate={(newCommentsJson, totalReceiptsAmount) => {
+                  updateOrderComments(orderToManage.id, newCommentsJson);
+                  if (totalReceiptsAmount !== undefined) {
+                    updateOrderAmountPaid(orderToManage.id, totalReceiptsAmount);
+                  }
+                }} 
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       

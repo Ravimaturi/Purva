@@ -79,6 +79,7 @@ import {
 } from "./ui/dialog";
 import { DrawingsTracker } from "./DrawingsTracker";
 import { ImageCropperDialog } from "./ImageCropperDialog";
+import { ProjectExpenses } from "./ProjectExpenses";
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return "N/A";
@@ -1307,6 +1308,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     Vendor Orders
                   </TabsTrigger>
                 )}
+                {(hasFinanceAccess(user?.role) ||
+                  hasProjectManagementAccess(user?.role)) && (
+                  <TabsTrigger
+                    value="expenses"
+                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none px-0 font-bold text-slate-400 data-[state=active]:text-indigo-600 text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap"
+                  >
+                    Expenses
+                  </TabsTrigger>
+                )}
                 {hasAuditLogAccess(user?.role) && (
                   <TabsTrigger
                     value="audit"
@@ -2081,17 +2091,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                           <div className="w-full pt-4 mt-2 border-t border-slate-50 dark:border-white/5">
                             <PaymentStageHistory
                               commentsJson={stage.comments}
-                              onUpdate={(newCommentsJson) =>
-                                updatePaymentComments(stage.id, newCommentsJson)
-                              }
-                              onReceiptAdded={(amount, date) => {
-                                const newAmount =
-                                  (stage.amount_received || 0) + amount;
-                                updatePaymentReceived(
-                                  stage.id,
-                                  newAmount,
-                                  date,
-                                );
+                              onUpdate={(newCommentsJson, totalReceiptsAmount) => {
+                                updatePaymentComments(stage.id, newCommentsJson);
+                                if (totalReceiptsAmount !== undefined) {
+                                  updatePaymentReceived(stage.id, totalReceiptsAmount, undefined);
+                                }
                               }}
                             />
                           </div>
@@ -2108,6 +2112,16 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     className="mt-0 p-4 sm:p-8 flex-1"
                   >
                     <ProjectVendorOrders project={project} />
+                  </TabsContent>
+                )}
+
+                {(hasFinanceAccess(user?.role) ||
+                  hasProjectManagementAccess(user?.role)) && (
+                  <TabsContent
+                    value="expenses"
+                    className="mt-0 p-4 sm:p-8 flex-1"
+                  >
+                    <ProjectExpenses project={project} />
                   </TabsContent>
                 )}
 
