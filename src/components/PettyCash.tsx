@@ -8,7 +8,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink } from 'lucide-react';
+import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportPettyCashToWord } from '../lib/exportToWord';
 import {
@@ -99,27 +99,35 @@ export const PettyCash = () => {
       throw new Error("Not logged into Microsoft. Please authenticate.");
     }
     
-    let token = "";
     try {
       const response = await instance.acquireTokenSilent({
         ...loginRequest,
         account: activeAccount
       });
-      token = response.accessToken;
+      return response.accessToken;
     } catch (e: any) {
-      if (interactive && (e.name === "InteractionRequiredAuthError" || e.errorCode === "interaction_required")) {
-         await customInteractiveLogin();
-         activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-         const response = await instance.acquireTokenSilent({
-           ...loginRequest,
-           account: activeAccount
-         });
-         token = response.accessToken;
+      console.warn("Silent token acquisition failed:", e);
+      if (interactive) {
+         try {
+           const popupResponse = await instance.acquireTokenPopup({
+             ...loginRequest,
+             account: activeAccount
+           });
+           return popupResponse.accessToken;
+         } catch (popupErr) {
+           console.warn("Popup token acquisition failed, falling back to custom logic:", popupErr);
+           await customInteractiveLogin();
+           activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+           const response = await instance.acquireTokenSilent({
+             ...loginRequest,
+             account: activeAccount
+           });
+           return response.accessToken;
+         }
       } else {
          throw e;
       }
     }
-    return token;
   }, [instance]);
 
   const getGraphClient = useCallback(async (interactive = false) => {
@@ -136,6 +144,7 @@ export const PettyCash = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Filters
@@ -670,14 +679,47 @@ export const PettyCash = () => {
   const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
   const paginatedEntries = filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const getPrintableImageUrl = (url: string) => {
+    if (!url) return '';
+    try {
+      const urlObj = new URL(url);
+      if (url.includes('sharepoint.com') || url.includes('1drv.ms')) {
+        urlObj.searchParams.set('download', '1');
+      }
+      return urlObj.toString();
+    } catch (e) {
+      return url;
+    }
+  };
+
   return (
-    <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+    <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500 print:p-0 print:m-0 print:max-w-none">
+      <div className={showPrintPreview ? "hidden" : "print:hidden"}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Petty Cash Tracking</h1>
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 sm:mt-0">
+        <div className="flex items-center gap-3 mt-4 sm:mt-0 print:hidden">
+          <Button 
+            onClick={() => {
+              setShowPrintPreview(true);
+              setTimeout(() => {
+                try {
+                  window.print();
+                } catch (e) {
+                  console.error("Print failed", e);
+                  toast.error("Printing might be blocked in this preview. Please open the app in a new tab to print.");
+                }
+              }, 500);
+            }} 
+            disabled={filteredEntries.length === 0}
+            variant="outline" 
+            className="font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            Print Report
+          </Button>
           <Button 
             onClick={handleExport} 
             disabled={isExporting || filteredEntries.length === 0}
@@ -1336,6 +1378,70 @@ export const PettyCash = () => {
                 </div>
               )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      </div>
+      {/* Print View */}
+      {(showPrintPreview || false) && (
+        <div className="fixed inset-0 z-50 bg-white dark:bg-white text-black overflow-y-auto print:static print:block print:inset-auto p-8 print:p-0">
+          <div className="max-w-4xl mx-auto print:p-0">
+            <div className="flex justify-between items-center mb-8 print:hidden">
+              <div>
+                <h2 className="text-2xl font-bold text-black">Print Preview</h2>
+                <p className="text-slate-500 text-sm mt-1">If the print dialog didn't open automatically, press Ctrl+P / Cmd+P. <br/>If it's blocked, please open the app in a new tab using the icon in the top right.</p>
+              </div>
+              <div className="flex gap-4">
+                <Button onClick={() => window.print()} variant="default" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Now
+                </Button>
+                <Button onClick={() => setShowPrintPreview(false)} variant="outline">
+                  <X className="w-4 h-4 mr-2" />
+                  Close
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-8 print:block">
+        <h2 className="text-2xl font-bold mb-4">Petty Cash Report</h2>
+        <div className="text-sm mb-6">
+          <p><strong>Date Range:</strong> {dateRange.start} to {dateRange.end}</p>
+          <p><strong>Total Advance:</strong> ₹{totalAdvance.toLocaleString()}</p>
+          <p><strong>Total Expenditure:</strong> ₹{totalExpenditure.toLocaleString()}</p>
+        </div>
+        
+        {filteredEntries.map((entry, index) => (
+          <div key={entry.id} className="border-b border-slate-200 pb-6 mb-6 break-inside-avoid">
+            <h3 className="text-lg font-bold">Entry {index + 1}: {entry.bill_name}</h3>
+            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+              <p><strong>Date:</strong> {new Date(entry.date).toLocaleDateString()}</p>
+              <p><strong>Project:</strong> {entry.project_name}</p>
+              <p><strong>Category:</strong> {entry.category}</p>
+              <p><strong>Raised By:</strong> {entry.raised_by_name}</p>
+              <p><strong>Advance:</strong> ₹{entry.advance_amount || 0}</p>
+              <p><strong>Expenditure:</strong> ₹{entry.expenditure_amount || 0}</p>
+            </div>
+            {entry.reason && (
+              <p className="mt-2 text-sm"><strong>Reason:</strong> {entry.reason}</p>
+            )}
+            {entry.receipt_url && (
+              <div className="mt-4">
+                <p className="font-semibold mb-2">Receipt:</p>
+                <img 
+                  src={getPrintableImageUrl(entry.receipt_url)} 
+                  alt="Receipt" 
+                  className="max-w-full max-h-[500px] object-contain border border-slate-200 rounded"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
             </div>
           </div>
         </div>
