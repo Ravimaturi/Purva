@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '../lib/msalConfig';
-import { Client } from '@microsoft/microsoft-graph-client';
+import { Client, ResponseType } from '@microsoft/microsoft-graph-client';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -138,20 +138,28 @@ export const PettyCash = () => {
              // Get the driveItem using the sharing URL
              const driveItem = await client.api(`/shares/${shareId}/driveItem`).get();
              
-             // The response usually contains a @microsoft.graph.downloadUrl property that doesn't need auth,
-             // or we can fetch the content directly via /content
-             if (driveItem["@microsoft.graph.downloadUrl"]) {
-               const response = await fetch(driveItem["@microsoft.graph.downloadUrl"]);
-               const blob = await response.blob();
-               const arrayBuffer = await blob.arrayBuffer();
-               let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
-               if (blob.type.includes("png")) type = "png";
-               else if (blob.type.includes("gif")) type = "gif";
-               else if (blob.type.includes("bmp")) type = "bmp";
-               return { arrayBuffer, type };
+             let blob: Blob;
+             
+             try {
+               // Try to download content directly using authenticated graph client to avoid CORS on download URL
+               const response = await client.api(`/shares/${shareId}/driveItem/content`).responseType(ResponseType.BLOB).get();
+               blob = response as Blob;
+             } catch (err) {
+               console.warn("Direct graph content fetch failed, falling back to downloadUrl", err);
+               if (driveItem["@microsoft.graph.downloadUrl"]) {
+                 const response = await fetch(driveItem["@microsoft.graph.downloadUrl"]);
+                 blob = await response.blob();
+               } else {
+                 throw new Error("Could not find download URL or content for image.");
+               }
              }
 
-             throw new Error("Could not find download URL for image.");
+             const arrayBuffer = await blob.arrayBuffer();
+             let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
+             if (blob.type.includes("png") || driveItem.name?.toLowerCase().endsWith(".png")) type = "png";
+             else if (blob.type.includes("gif") || driveItem.name?.toLowerCase().endsWith(".gif")) type = "gif";
+             else if (blob.type.includes("bmp") || driveItem.name?.toLowerCase().endsWith(".bmp")) type = "bmp";
+             return { arrayBuffer, type };
            } else {
              const response = await fetch(url, { mode: 'cors' });
              if (!response.ok) return null;
