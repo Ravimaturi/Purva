@@ -8,10 +8,9 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer, RefreshCw, FileImage } from 'lucide-react';
+import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, RefreshCw, } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportPettyCashToWord } from '../lib/exportToWord';
-import { exportReceiptsToWord } from '../lib/exportReceiptsToWord';
 import {
   BarChart,
   Bar,
@@ -45,20 +44,6 @@ interface PettyCashEntry {
   created_at: string;
   receipt_url?: string;
 }
-export const SecureImage = ({ url, className, onLoaded, refreshTrigger, getGraphToken }: { url: string, className?: string, onLoaded?: () => void, refreshTrigger?: number, getGraphToken: (interactive?: boolean) => Promise<string> }) => {
-    const [imgSrc, setImgSrc] = useState<string | null>(null);
-    const [hasError, setHasError] = useState(false);
-    const [hasCalledOnLoaded, setHasCalledOnLoaded] = useState(false);
-
-    const handleLoaded = () => {
-      if (!hasCalledOnLoaded && onLoaded) {
-        setHasCalledOnLoaded(true);
-        onLoaded();
-    }
-  };
-
-};
-
 export function PettyCash() {
   const { user, allUsers } = useUser();
   const { addNotification } = useNotifications();
@@ -159,10 +144,7 @@ export function PettyCash() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [loadedImagesCount, setLoadedImagesCount] = useState(0);
-  const [autoPrintTriggered, setAutoPrintTriggered] = useState(false);
-  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+        const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -193,98 +175,7 @@ export function PettyCash() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingReceipts, setIsExportingReceipts] = useState(false);
-
-  const handleExportReceipts = async () => {
-    setIsExportingReceipts(true);
-    try {
-      const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
-      if (hasSharepointLinks) {
-         try {
-           await getGraphToken(true);
-         } catch (e: any) {
-           console.warn("Failed to acquire MSAL token interactively upfront:", e);
-           toast.error(`Microsoft Auth failed: ${e.message}`);
-         }
-      }
-
-      const fetchImage = async (url: string) => {
-        try {
-           let originalBlob: Blob;
-           
-           if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
-             const client = await getGraphClient(false);
-             const base64Str = btoa(unescape(encodeURIComponent(url)));
-             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-             
-             try {
-               const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
-               let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
-               
-               if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
-                  downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
-               }
-               if (!downloadUrl) throw new Error("Could not find download URL");
-               
-               const response = await fetch(downloadUrl);
-               if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
-               originalBlob = await response.blob();
-             } catch (err) {
-               console.warn("Thumbnail fetch failed, trying direct content fetch", err);
-               const token = await getGraphToken(false);
-               const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
-                 headers: { Authorization: `Bearer ${token}` }
-               });
-               if (!response.ok) throw new Error(`Direct fetch failed with status ${response.status}`);
-               originalBlob = await response.blob();
-             }
-           } else {
-             try {
-               const response = await fetch(url, { mode: 'cors' });
-               if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
-               originalBlob = await response.blob();
-             } catch (fetchError) {
-               console.warn("Direct fetch failed, trying proxy", fetchError);
-               const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
-               if (!proxyResponse.ok) throw new Error(`Proxy fetch failed: ${proxyResponse.status}`);
-               originalBlob = await proxyResponse.blob();
-             }
-           }
-           
-           if (originalBlob.type.includes('text/html')) throw new Error("Fetched content is HTML");
-
-           const convertResponse = await fetch('/api/convert-image', {
-             method: 'POST',
-             body: originalBlob,
-             headers: { 'Content-Type': originalBlob.type || 'application/octet-stream' }
-           });
-           
-           if (!convertResponse.ok) throw new Error(`Backend conversion failed`);
-           
-           const widthStr = convertResponse.headers.get('x-image-width');
-           const heightStr = convertResponse.headers.get('x-image-height');
-           const width = widthStr ? parseInt(widthStr, 10) : undefined;
-           const height = heightStr ? parseInt(heightStr, 10) : undefined;
-           
-           const jpegBlob = await convertResponse.blob();
-           const arrayBuffer = await jpegBlob.arrayBuffer();
-           return { arrayBuffer, type: "jpg" as const, width, height };
-        } catch (error: any) {
-          console.error("Error fetching image", error);
-          toast.error(`Failed to load image: ${error.message}`);
-          return null;
-        }
-      };
-
-      await exportReceiptsToWord(filteredEntries, fetchImage);
-      toast.success('Receipts export completed successfully');
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to export receipts to Word');
-    } finally {
-      setIsExportingReceipts(false);
-    }
-  };
+  
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -793,45 +684,16 @@ export function PettyCash() {
 
   const totalReceiptsCount = useMemo(() => filteredEntries.filter(e => e.receipt_url).length, [filteredEntries]);
 
-  useEffect(() => {
-    if (showPrintPreview && !autoPrintTriggered) {
-      if (loadedImagesCount >= totalReceiptsCount) {
-        setAutoPrintTriggered(true);
-        setTimeout(() => {
-          try {
-            window.print();
-        } catch (e) {
-            console.error("Print failed", e);
-            toast.error("Printing might be blocked in this preview. Please open the app in a new tab to print.");
-        }
-      }, 500);
-    }
-  }
-}, [showPrintPreview, loadedImagesCount, totalReceiptsCount, autoPrintTriggered]);
-
   return (
-    <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500 print:p-0 print:m-0 print:max-w-none">
-      <div className={showPrintPreview ? "hidden" : "print:hidden"}>
+    <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+      <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Petty Cash Tracking</h1>
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0 print:hidden">
-          <Button 
-            onClick={() => {
-              setLoadedImagesCount(0);
-              setAutoPrintTriggered(false);
-              setImageRefreshKey(prev => prev + 1);
-              setShowPrintPreview(true);
-          }} 
-            disabled={filteredEntries.length === 0}
-            variant="outline" 
-            className="font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            Print Report
-          </Button>
+          
           <Button 
             onClick={handleExport} 
             disabled={isExporting || filteredEntries.length === 0}
@@ -841,15 +703,7 @@ export function PettyCash() {
             {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
             Export to Word
           </Button>
-          <Button 
-            onClick={handleExportReceipts} 
-            disabled={isExportingReceipts || filteredEntries.length === 0}
-            variant="outline" 
-            className="font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-          >
-            {isExportingReceipts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileImage className="w-4 h-4 mr-2" />}
-            Export Receipts
-          </Button>
+          
           {(canCreate || showForm) && (
             <Button onClick={() => {
               if (showForm) {
@@ -1506,80 +1360,6 @@ export function PettyCash() {
 
       </div>
       {/* Print View */}
-      {(showPrintPreview || false) && (
-        <div className="fixed inset-0 z-50 bg-white dark:bg-white text-black overflow-y-auto print:static print:block print:inset-auto p-8 print:p-0">
-          <div className="max-w-4xl mx-auto print:p-0">
-            <div className="flex justify-between items-center mb-8 print:hidden">
-              <div>
-                <h2 className="text-2xl font-bold text-black">Print Preview</h2>
-                <p className="text-slate-500 text-sm mt-1">
-                  {loadedImagesCount < totalReceiptsCount 
-                    ? `Loading images (${loadedImagesCount}/${totalReceiptsCount})...` 
-                    : "If the print dialog didn't open automatically, press Ctrl+P / Cmd+P. If it's blocked, please open the app in a new tab using the icon in the top right."}
-                </p>
-              </div>
-              <div className="flex gap-4">
-                <Button 
-                  onClick={() => {
-                    setLoadedImagesCount(0);
-                    setAutoPrintTriggered(false);
-                    setImageRefreshKey(prev => prev + 1);
-                }} 
-                  variant="outline"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Reload Images
-                </Button>
-                <Button onClick={() => window.print()} variant="default" className="bg-emerald-600 hover:bg-emerald-700">
-                  <Printer className="w-4 h-4 mr-2" />
-                  Print Now
-                </Button>
-                <Button onClick={() => setShowPrintPreview(false)} variant="outline">
-                  <X className="w-4 h-4 mr-2" />
-                  Close
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-8 print:block">
-        <h2 className="text-2xl font-bold mb-4">Petty Cash Report</h2>
-        <div className="text-sm mb-6">
-          <p><strong>Date Range:</strong> {dateRange.start} to {dateRange.end}</p>
-          <p><strong>Total Advance:</strong> ₹{totalAdvance.toLocaleString()}</p>
-          <p><strong>Total Expenditure:</strong> ₹{totalExpenditure.toLocaleString()}</p>
-        </div>
-        
-        {filteredEntries.map((entry, index) => (
-          <div key={entry.id} className="border-b border-slate-200 pb-6 mb-6 break-inside-avoid">
-            <h3 className="text-lg font-bold">Entry {index + 1}: {entry.bill_name}</h3>
-            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-              <p><strong>Date:</strong> {new Date(entry.date).toLocaleDateString()}</p>
-              <p><strong>Project:</strong> {entry.project_name}</p>
-              <p><strong>Category:</strong> {entry.category}</p>
-              <p><strong>Raised By:</strong> {entry.raised_by_name}</p>
-              <p><strong>Advance:</strong> ₹{entry.advance_amount || 0}</p>
-              <p><strong>Expenditure:</strong> ₹{entry.expenditure_amount || 0}</p>
-            </div>
-            {entry.reason && (
-              <p className="mt-2 text-sm"><strong>Reason:</strong> {entry.reason}</p>
-            )}
-            {entry.receipt_url && (
-              <div className="mt-4">
-                <p className="font-semibold mb-2">Receipt:</p>
-                <SecureImage getGraphToken={getGraphToken} url={entry.receipt_url} 
-                  className="max-w-full max-h-[500px] object-contain border border-slate-200 rounded"
-                  onLoaded={() => setLoadedImagesCount(prev => prev + 1)}
-                  refreshTrigger={imageRefreshKey}
-                />
-              </div>
-            )}
           </div>
-        ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
-
 }
