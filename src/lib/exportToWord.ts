@@ -15,7 +15,7 @@ export interface ExportEntry {
   receipt_url?: string;
 }
 
-export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher?: (url: string) => Promise<{ arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp" } | null>) => {
+export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher?: (url: string) => Promise<{ arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp", width?: number, height?: number } | null>) => {
   const children: any[] = [];
 
   children.push(
@@ -107,6 +107,12 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
         }
 
         if (imageData) {
+          let calcWidth = 400;
+          let calcHeight = 400;
+          const img = imageData as any;
+          if (img.width && img.height) {
+            calcHeight = Math.round((400 / img.width) * img.height);
+          }
           children.push(
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -114,8 +120,8 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
                 new ImageRun({
                   data: imageData.arrayBuffer,
                   transformation: {
-                    width: 400,
-                    height: 400,
+                    width: calcWidth,
+                    height: calcHeight,
                   },
                   type: imageData.type,
                 }),
