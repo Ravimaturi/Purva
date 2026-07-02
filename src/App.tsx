@@ -18,6 +18,7 @@ import { Toaster } from './components/ui/sonner';
 import { Sheet, SheetContent } from './components/ui/sheet';
 import { ProjectDetails } from './components/ProjectDetails';
 import { AssetManagement } from './components/AssetManagement';
+import { TimeTracking } from './components/TimeTracking';
 import { Project } from './types';
 import { cn } from './lib/utils';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -140,6 +141,8 @@ function MainApp() {
         return <GlobalKanban onProjectClick={handleProjectClick} />;
       case 'calendar':
         return <GlobalCalendar onProjectClick={handleProjectClick} />;
+      case 'time_tracking':
+        return <TimeTracking />;
       case 'team':
         return <TeamManagement />;
       case 'vendors':

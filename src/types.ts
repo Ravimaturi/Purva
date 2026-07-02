@@ -133,9 +133,14 @@ export interface Vendor {
   vendor_name: string;
   contact_person_name: string;
   phone_no: string;
+  email?: string;
   pan_card_no: string;
   gst_no: string;
   services_list: string;
+  bank_account_name?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  bank_name?: string;
   created_at: string;
 }
 
