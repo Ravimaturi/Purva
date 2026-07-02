@@ -131,6 +131,7 @@ export const PettyCash = () => {
     try {
       const fetchImage = async (url: string) => {
         try {
+           let originalBlob: Blob;
            if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
              const client = await getGraphClient(true);
              const shareId = "u!" + btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -138,39 +139,59 @@ export const PettyCash = () => {
              // Get the driveItem using the sharing URL
              const driveItem = await client.api(`/shares/${shareId}/driveItem`).get();
              
-             let blob: Blob;
-             
              try {
                // Try to download content directly using authenticated graph client to avoid CORS on download URL
                const response = await client.api(`/shares/${shareId}/driveItem/content`).responseType(ResponseType.BLOB).get();
-               blob = response as Blob;
+               originalBlob = response as Blob;
              } catch (err) {
                console.warn("Direct graph content fetch failed, falling back to downloadUrl", err);
                if (driveItem["@microsoft.graph.downloadUrl"]) {
                  const response = await fetch(driveItem["@microsoft.graph.downloadUrl"]);
-                 blob = await response.blob();
+                 originalBlob = await response.blob();
                } else {
                  throw new Error("Could not find download URL or content for image.");
                }
              }
-
-             const arrayBuffer = await blob.arrayBuffer();
-             let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
-             if (blob.type.includes("png") || driveItem.name?.toLowerCase().endsWith(".png")) type = "png";
-             else if (blob.type.includes("gif") || driveItem.name?.toLowerCase().endsWith(".gif")) type = "gif";
-             else if (blob.type.includes("bmp") || driveItem.name?.toLowerCase().endsWith(".bmp")) type = "bmp";
-             return { arrayBuffer, type };
            } else {
              const response = await fetch(url, { mode: 'cors' });
              if (!response.ok) return null;
-             const blob = await response.blob();
-             const arrayBuffer = await blob.arrayBuffer();
-             let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
-             if (blob.type.includes("png")) type = "png";
-             else if (blob.type.includes("gif")) type = "gif";
-             else if (blob.type.includes("bmp")) type = "bmp";
-             return { arrayBuffer, type };
+             originalBlob = await response.blob();
            }
+
+           const convertBlobToJpeg = (blob: Blob): Promise<Blob> => {
+             return new Promise((resolve, reject) => {
+               const objUrl = URL.createObjectURL(blob);
+               const img = new Image();
+               img.onload = () => {
+                 const canvas = document.createElement('canvas');
+                 canvas.width = img.width;
+                 canvas.height = img.height;
+                 const ctx = canvas.getContext('2d');
+                 if (ctx) {
+                   ctx.fillStyle = "#ffffff";
+                   ctx.fillRect(0, 0, canvas.width, canvas.height);
+                   ctx.drawImage(img, 0, 0);
+                   canvas.toBlob((newBlob) => {
+                     URL.revokeObjectURL(objUrl);
+                     if (newBlob) resolve(newBlob);
+                     else reject(new Error("Canvas to Blob failed"));
+                   }, 'image/jpeg', 0.9);
+                 } else {
+                   URL.revokeObjectURL(objUrl);
+                   reject(new Error("Could not get canvas context"));
+                 }
+               };
+               img.onerror = () => {
+                 URL.revokeObjectURL(objUrl);
+                 reject(new Error("Image load failed"));
+               };
+               img.src = objUrl;
+             });
+           };
+
+           const jpegBlob = await convertBlobToJpeg(originalBlob);
+           const arrayBuffer = await jpegBlob.arrayBuffer();
+           return { arrayBuffer, type: "jpg" as const };
         } catch (error) {
           console.error("Error fetching image", error);
           return null;
