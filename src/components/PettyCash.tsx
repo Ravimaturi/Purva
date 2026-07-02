@@ -51,13 +51,48 @@ export const PettyCash = () => {
   const { canManagePettyCash } = useFileSettings();
   const isAdmin = canManagePettyCash(user?.role, 'edit') || hasAdminAccess(user?.role);
   const canCreate = canManagePettyCash(user?.role, 'create');
+
   const { instance, accounts, inProgress } = useMsal();
   const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
   
+  const customInteractiveLogin = () => {
+    return new Promise<void>((resolve, reject) => {
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      window.open(`${window.location.origin}?auth_action=login`, 'oauth_popup', `width=${width},height=${height},left=${left},top=${top}`);
+      
+      const receiveMessage = async (event: MessageEvent) => {
+        if (typeof event.data === 'string' && event.data === 'msal_login_success') {
+          window.removeEventListener('message', receiveMessage);
+          resolve();
+        }
+      };
+      window.addEventListener('message', receiveMessage);
+      
+      let attempts = 0;
+      const pollInterval = setInterval(() => {
+        attempts++;
+        if (attempts > 180) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', receiveMessage);
+          reject(new Error("Authentication popup timed out"));
+          return;
+        }
+        if (instance.getAllAccounts().length > 0) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', receiveMessage);
+          resolve();
+        }
+      }, 1500);
+    });
+  };
+
   const getGraphToken = useCallback(async (interactive = false) => {
     let activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
     if (!activeAccount && interactive) {
-      await instance.loginPopup(loginRequest);
+      await customInteractiveLogin();
       activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
     }
     if (!activeAccount) {
@@ -73,7 +108,12 @@ export const PettyCash = () => {
       token = response.accessToken;
     } catch (e: any) {
       if (interactive && (e.name === "InteractionRequiredAuthError" || e.errorCode === "interaction_required")) {
-         const response = await instance.acquireTokenPopup(loginRequest);
+         await customInteractiveLogin();
+         activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+         const response = await instance.acquireTokenSilent({
+           ...loginRequest,
+           account: activeAccount
+         });
          token = response.accessToken;
       } else {
          throw e;
@@ -90,7 +130,7 @@ export const PettyCash = () => {
       }
     });
   }, [getGraphToken]);
-  
+
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,11 +173,22 @@ export const PettyCash = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
+      const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
+      if (hasSharepointLinks) {
+         try {
+           await getGraphToken(true);
+         } catch (e: any) {
+           console.warn("Failed to acquire MSAL token interactively upfront:", e);
+           toast.error(`Microsoft Auth failed: ${e.message}`);
+         }
+      }
+
       const fetchImage = async (url: string) => {
         try {
            let originalBlob: Blob;
+           
            if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
-             const client = await getGraphClient(true);
+             const client = await getGraphClient(false);
              const base64Str = btoa(unescape(encodeURIComponent(url)));
              const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
              
@@ -160,7 +211,7 @@ export const PettyCash = () => {
                originalBlob = await response.blob();
              } catch (err) {
                console.warn("Thumbnail fetch failed, trying direct content fetch", err);
-               const token = await getGraphToken(true);
+               const token = await getGraphToken(false);
                const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
                  headers: { Authorization: `Bearer ${token}` }
                });
