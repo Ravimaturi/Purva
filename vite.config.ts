@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [
     react(), 
     tailwindcss(),
@@ -50,5 +51,13 @@ export default defineConfig({
   },
   server: {
     hmr: process.env.DISABLE_HMR !== 'true',
+    proxy: {
+      '/supabase-api': {
+        target: 'http://supabasekong-ffyoj28pwvhn7z3s2qjw010j.89.116.122.17.sslip.io',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/supabase-api/, '')
+      }
+    }
   },
 });
