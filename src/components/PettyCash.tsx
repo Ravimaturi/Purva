@@ -138,7 +138,8 @@ export const PettyCash = () => {
            let originalBlob: Blob;
            if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
              const client = await getGraphClient(true);
-             const shareId = "u!" + btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+             const base64Str = btoa(unescape(encodeURIComponent(url)));
+             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
              
              try {
                // First try to get the large thumbnail which usually has CORS headers enabled
@@ -169,11 +170,20 @@ export const PettyCash = () => {
                originalBlob = await response.blob();
              }
            } else {
-             const response = await fetch(url, { mode: 'cors' });
-             if (!response.ok) {
-               throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+             try {
+               const response = await fetch(url, { mode: 'cors' });
+               if (!response.ok) {
+                 throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+               }
+               originalBlob = await response.blob();
+             } catch (fetchError) {
+               console.warn("Direct fetch failed, trying proxy", fetchError);
+               const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+               if (!proxyResponse.ok) {
+                 throw new Error(`Failed to fetch image via proxy: ${proxyResponse.status} ${proxyResponse.statusText}`);
+               }
+               originalBlob = await proxyResponse.blob();
              }
-             originalBlob = await response.blob();
            }
 
            const convertBlobToJpeg = (blob: Blob): Promise<Blob> => {
