@@ -8,9 +8,10 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer, RefreshCw } from 'lucide-react';
+import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer, RefreshCw, FileImage } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportPettyCashToWord } from '../lib/exportToWord';
+import { exportReceiptsToWord } from '../lib/exportReceiptsToWord';
 import {
   BarChart,
   Bar,
@@ -44,8 +45,21 @@ interface PettyCashEntry {
   created_at: string;
   receipt_url?: string;
 }
+export const SecureImage = ({ url, className, onLoaded, refreshTrigger, getGraphToken }: { url: string, className?: string, onLoaded?: () => void, refreshTrigger?: number, getGraphToken: (interactive?: boolean) => Promise<string> }) => {
+    const [imgSrc, setImgSrc] = useState<string | null>(null);
+    const [hasError, setHasError] = useState(false);
+    const [hasCalledOnLoaded, setHasCalledOnLoaded] = useState(false);
 
-export const PettyCash = () => {
+    const handleLoaded = () => {
+      if (!hasCalledOnLoaded && onLoaded) {
+        setHasCalledOnLoaded(true);
+        onLoaded();
+    }
+  };
+
+};
+
+export function PettyCash() {
   const { user, allUsers } = useUser();
   const { addNotification } = useNotifications();
   const { canManagePettyCash } = useFileSettings();
@@ -67,8 +81,8 @@ export const PettyCash = () => {
         if (typeof event.data === 'string' && event.data === 'msal_login_success') {
           window.removeEventListener('message', receiveMessage);
           resolve();
-        }
-      };
+      }
+    };
       window.addEventListener('message', receiveMessage);
       
       let attempts = 0;
@@ -79,65 +93,66 @@ export const PettyCash = () => {
           window.removeEventListener('message', receiveMessage);
           reject(new Error("Authentication popup timed out"));
           return;
-        }
+      }
         if (instance.getAllAccounts().length > 0) {
           clearInterval(pollInterval);
           window.removeEventListener('message', receiveMessage);
           resolve();
-        }
-      }, 1500);
-    });
-  };
+      }
+    }, 1500);
+  });
+};
+
 
   const getGraphToken = useCallback(async (interactive = false) => {
     let activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
     if (!activeAccount && interactive) {
       await customInteractiveLogin();
       activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-    }
+  }
     if (!activeAccount) {
       throw new Error("Not logged into Microsoft. Please authenticate.");
-    }
+  }
     
     try {
       const response = await instance.acquireTokenSilent({
         ...loginRequest,
         account: activeAccount
-      });
+    });
       return response.accessToken;
-    } catch (e: any) {
+  } catch (e: any) {
       console.warn("Silent token acquisition failed:", e);
       if (interactive) {
          try {
            const popupResponse = await instance.acquireTokenPopup({
              ...loginRequest,
              account: activeAccount
-           });
+         });
            return popupResponse.accessToken;
-         } catch (popupErr) {
+       } catch (popupErr) {
            console.warn("Popup token acquisition failed, falling back to custom logic:", popupErr);
            await customInteractiveLogin();
            activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
            const response = await instance.acquireTokenSilent({
              ...loginRequest,
              account: activeAccount
-           });
+         });
            return response.accessToken;
-         }
-      } else {
+       }
+    } else {
          throw e;
-      }
     }
-  }, [instance]);
+  }
+}, [instance]);
 
   const getGraphClient = useCallback(async (interactive = false) => {
     const token = await getGraphToken(interactive);
     return Client.init({
       authProvider: (done) => {
         done(null, token);
-      }
-    });
-  }, [getGraphToken]);
+    }
+  });
+}, [getGraphToken]);
 
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
@@ -171,20 +186,17 @@ export const PettyCash = () => {
     advance_amount: '',
     expenditure_amount: '',
     raised_by_id: ''
-  };
+};
   const [form, setForm] = useState(emptyForm);
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isExportingReceipts, setIsExportingReceipts] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
-  const handleExport = async () => {
-    setIsExporting(true);
+  const handleExportReceipts = async () => {
+    setIsExportingReceipts(true);
     try {
       const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
       if (hasSharepointLinks) {
@@ -206,18 +218,13 @@ export const PettyCash = () => {
              const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
              
              try {
-               // First try to get the large thumbnail which usually has CORS headers enabled
                const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
                let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
                
                if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
-                  // Prefer large thumbnail
                   downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
                }
-
-               if (!downloadUrl) {
-                 throw new Error("Could not find download URL or thumbnail for image.");
-               }
+               if (!downloadUrl) throw new Error("Could not find download URL");
                
                const response = await fetch(downloadUrl);
                if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
@@ -228,43 +235,31 @@ export const PettyCash = () => {
                const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
                  headers: { Authorization: `Bearer ${token}` }
                });
-               if (!response.ok) {
-                 throw new Error(`Direct graph content fetch failed with status ${response.status}`);
-               }
+               if (!response.ok) throw new Error(`Direct fetch failed with status ${response.status}`);
                originalBlob = await response.blob();
              }
            } else {
              try {
                const response = await fetch(url, { mode: 'cors' });
-               if (!response.ok) {
-                 throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-               }
+               if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
                originalBlob = await response.blob();
              } catch (fetchError) {
                console.warn("Direct fetch failed, trying proxy", fetchError);
                const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
-               if (!proxyResponse.ok) {
-                 throw new Error(`Failed to fetch image via proxy: ${proxyResponse.status} ${proxyResponse.statusText}`);
-               }
+               if (!proxyResponse.ok) throw new Error(`Proxy fetch failed: ${proxyResponse.status}`);
                originalBlob = await proxyResponse.blob();
              }
            }
            
-           if (originalBlob.type.includes('text/html')) {
-             throw new Error("Fetched content is an HTML page (possibly a login redirect), not an image.");
-           }
+           if (originalBlob.type.includes('text/html')) throw new Error("Fetched content is HTML");
 
            const convertResponse = await fetch('/api/convert-image', {
              method: 'POST',
              body: originalBlob,
-             headers: {
-               'Content-Type': originalBlob.type || 'application/octet-stream'
-             }
+             headers: { 'Content-Type': originalBlob.type || 'application/octet-stream' }
            });
            
-           if (!convertResponse.ok) {
-             throw new Error(`Backend image conversion failed: ${convertResponse.statusText}`);
-           }
+           if (!convertResponse.ok) throw new Error(`Backend conversion failed`);
            
            const widthStr = convertResponse.headers.get('x-image-width');
            const heightStr = convertResponse.headers.get('x-image-height');
@@ -281,19 +276,131 @@ export const PettyCash = () => {
         }
       };
 
-      await exportPettyCashToWord(filteredEntries, fetchImage);
-      toast.success('Export completed successfully');
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to export to Word');
+      await exportReceiptsToWord(filteredEntries, fetchImage);
+      toast.success('Receipts export completed successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export receipts to Word');
     } finally {
-      setIsExporting(false);
+      setIsExportingReceipts(false);
     }
   };
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
+      if (hasSharepointLinks) {
+         try {
+           await getGraphToken(true);
+       } catch (e: any) {
+           console.warn("Failed to acquire MSAL token interactively upfront:", e);
+           toast.error(`Microsoft Auth failed: ${e.message}`);
+       }
+    }
+
+      const fetchImage = async (url: string) => {
+        try {
+           let originalBlob: Blob;
+           
+           if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
+             const client = await getGraphClient(false);
+             const base64Str = btoa(unescape(encodeURIComponent(url)));
+             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+             
+             try {
+               // First try to get the large thumbnail which usually has CORS headers enabled
+               const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
+               let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
+               
+               if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
+                  // Prefer large thumbnail
+                  downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
+             }
+
+               if (!downloadUrl) {
+                 throw new Error("Could not find download URL or thumbnail for image.");
+             }
+               
+               const response = await fetch(downloadUrl);
+               if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
+               originalBlob = await response.blob();
+           } catch (err) {
+               console.warn("Thumbnail fetch failed, trying direct content fetch", err);
+               const token = await getGraphToken(false);
+               const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
+                 headers: { Authorization: `Bearer ${token}` }
+             });
+               if (!response.ok) {
+                 throw new Error(`Direct graph content fetch failed with status ${response.status}`);
+             }
+               originalBlob = await response.blob();
+           }
+         } else {
+             try {
+               const response = await fetch(url, { mode: 'cors' });
+               if (!response.ok) {
+                 throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+             }
+               originalBlob = await response.blob();
+           } catch (fetchError) {
+               console.warn("Direct fetch failed, trying proxy", fetchError);
+               const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+               if (!proxyResponse.ok) {
+                 throw new Error(`Failed to fetch image via proxy: ${proxyResponse.status} ${proxyResponse.statusText}`);
+             }
+               originalBlob = await proxyResponse.blob();
+           }
+         }
+           
+           if (originalBlob.type.includes('text/html')) {
+             throw new Error("Fetched content is an HTML page (possibly a login redirect), not an image.");
+         }
+
+           const convertResponse = await fetch('/api/convert-image', {
+             method: 'POST',
+             body: originalBlob,
+             headers: {
+               'Content-Type': originalBlob.type || 'application/octet-stream'
+           }
+         });
+           
+           if (!convertResponse.ok) {
+             throw new Error(`Backend image conversion failed: ${convertResponse.statusText}`);
+         }
+           
+           const widthStr = convertResponse.headers.get('x-image-width');
+           const heightStr = convertResponse.headers.get('x-image-height');
+           const width = widthStr ? parseInt(widthStr, 10) : undefined;
+           const height = heightStr ? parseInt(heightStr, 10) : undefined;
+           
+           const jpegBlob = await convertResponse.blob();
+           const arrayBuffer = await jpegBlob.arrayBuffer();
+           return { arrayBuffer, type: "jpg" as const, width, height };
+      } catch (error: any) {
+          console.error("Error fetching image", error);
+          toast.error(`Failed to load image: ${error.message}`);
+          return null;
+      }
+    };
+
+      await exportPettyCashToWord(filteredEntries, fetchImage);
+      toast.success('Export completed successfully');
+  } catch (err) {
+      console.error(err);
+      toast.error('Failed to export to Word');
+  } finally {
+      setIsExporting(false);
+  }
+};
 
   useEffect(() => {
     fetchQueries();
-  }, [dateRange.start, dateRange.end]);
+}, [dateRange.start, dateRange.end]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -317,13 +424,13 @@ export const PettyCash = () => {
           if (width > MAX_WIDTH) {
             height *= MAX_WIDTH / width;
             width = MAX_WIDTH;
-          }
-        } else {
+        }
+      } else {
           if (height > MAX_HEIGHT) {
             width *= MAX_HEIGHT / height;
             height = MAX_HEIGHT;
-          }
         }
+      }
         
         canvas.width = width;
         canvas.height = height;
@@ -334,12 +441,12 @@ export const PettyCash = () => {
           if (blob) {
             const webpFile = new File([blob], `${Date.now()}_receipt.webp`, { type: 'image/webp' });
             setReceiptFile(webpFile);
-          }
+        }
           setIsCompressing(false);
-        }, 'image/webp', 0.8);
-      };
+      }, 'image/webp', 0.8);
     };
   };
+};
 
   const fetchQueries = async () => {
     setIsLoading(true);
@@ -355,10 +462,10 @@ export const PettyCash = () => {
         
       if (dateRange.start) {
         query = query.gte('date', dateRange.start);
-      }
+    }
       if (dateRange.end) {
         query = query.lte('date', dateRange.end);
-      }
+    }
       
       // Limit slightly just in case the date range selected is massive
       query = query.limit(3000);
@@ -366,21 +473,21 @@ export const PettyCash = () => {
       // If not admin, restrict to own entries or entries this user entered
       if (!isAdmin && user?.id) {
         query = query.or(`raised_by_id.eq.${user.id},entered_by_id.eq.${user.id}`);
-      }
+    }
 
       const { data, error } = await query;
       
       if (error) {
         console.error("Fetch error or table doesn't exist yet:", error);
-      } else if (data) {
+    } else if (data) {
         setEntries(data as PettyCashEntry[]);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error) {
+      console.error(error);
+  } finally {
+      setIsLoading(false);
+  }
+};
 
   const handleEdit = (entry: PettyCashEntry) => {
     setEditingId(entry.id);
@@ -393,16 +500,16 @@ export const PettyCash = () => {
       advance_amount: entry.advance_amount ? entry.advance_amount.toString() : '',
       expenditure_amount: entry.expenditure_amount ? entry.expenditure_amount.toString() : '',
       raised_by_id: entry.raised_by_id || ''
-    });
+  });
     setExistingReceiptUrl(entry.receipt_url || null);
     setReceiptFile(null);
     setShowForm(true);
-  };
+};
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
-  };
+};
 
   const handleSubmit = async (e: React.FormEvent, addAnother = false) => {
     e.preventDefault();
@@ -424,13 +531,13 @@ export const PettyCash = () => {
           
           if (receiptFile.size <= 4 * 1024 * 1024) {
              await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/content`).put(receiptFile);
-          } else {
+        } else {
              const uploadSession = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createUploadSession`).post({
                item: {
                  "@microsoft.graph.conflictBehavior": "replace",
                  "name": receiptFile.name
-               }
-             });
+             }
+           });
              
              const uploadUrl = uploadSession.uploadUrl;
              const maxChunkSize = 320 * 1024 * 10;
@@ -444,32 +551,32 @@ export const PettyCash = () => {
                  method: 'PUT',
                  headers: { 'Content-Range': `bytes ${start}-${end - 1}/${size}` },
                  body: chunk
-               });
+             });
                if (!response.ok) throw new Error(`Upload failed at chunk ${start}-${end}`);
                start = end;
-             }
-          }
+           }
+        }
           
           let sharedUrl = '';
           try {
             const permission = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}:/createLink`).post({
               type: 'view',
               scope: 'organization'
-            });
+          });
             sharedUrl = permission.link.webUrl;
-          } catch (linkError) {
+        } catch (linkError) {
              console.error("Error creating sharing link:", linkError);
              const item = await client.api(`/me/drive/root:/${encodedFolder}/${encodedFile}`).get();
              sharedUrl = item.webUrl;
-          }
+        }
           finalReceiptUrl = sharedUrl;
-        } catch (uploadError) {
+      } catch (uploadError) {
            console.error("Upload error", uploadError);
            toast.error("Failed to upload receipt to Microsoft OneDrive. Please make sure you are logged in.");
            setIsSubmitting(false);
            return;
-        }
       }
+    }
 
       if (editingId) {
         const updatePayload: any = {
@@ -480,15 +587,15 @@ export const PettyCash = () => {
           reason: form.reason,
           advance_amount: adv,
           expenditure_amount: exp
-        };
+      };
         
         if (form.raised_by_id && form.raised_by_id !== '') {
           const selectedUser = allUsers?.find(u => u.id === form.raised_by_id);
           if (selectedUser) {
             updatePayload.raised_by_id = selectedUser.id;
             updatePayload.raised_by_name = selectedUser.full_name;
-          }
         }
+      }
         
         if (finalReceiptUrl) updatePayload.receipt_url = finalReceiptUrl;
 
@@ -497,7 +604,7 @@ export const PettyCash = () => {
         
         if (!data || data.length === 0) {
            throw new Error("Missing UPDATE policy on petty_cash table. Admin needs to run: CREATE POLICY \"Enable update for users\" ON petty_cash FOR UPDATE USING (true);");
-        }
+      }
         
         const updatedEntries = entries.map(e => String(e.id) === editingId ? { ...e, ...updatePayload } : e);
         setEntries(updatedEntries);
@@ -508,7 +615,7 @@ export const PettyCash = () => {
         setReceiptFile(null);
         setExistingReceiptUrl(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
-      } else {
+    } else {
         const newEntry: any = {
           date: form.date,
           project_name: form.project_name,
@@ -521,15 +628,15 @@ export const PettyCash = () => {
           raised_by_name: user.full_name,
           entered_by_id: user.id,
           entered_by_name: user.full_name,
-        };
+      };
         
         if (form.raised_by_id && form.raised_by_id !== '') {
           const selectedUser = allUsers?.find(u => u.id === form.raised_by_id);
           if (selectedUser) {
             newEntry.raised_by_id = selectedUser.id;
             newEntry.raised_by_name = selectedUser.full_name;
-          }
         }
+      }
         
         if (finalReceiptUrl) newEntry.receipt_url = finalReceiptUrl;
 
@@ -548,7 +655,7 @@ export const PettyCash = () => {
           const notificationMessage = `${amtStr} | Reason: ${data[0].reason || 'N/A'} | Paid By: ${data[0].raised_by_name || 'N/A'}`;
           
           await addNotification(notificationTitle, notificationMessage);
-        }
+      }
 
         if (addAnother) {
           setForm({
@@ -557,33 +664,33 @@ export const PettyCash = () => {
             reason: '',
             advance_amount: '',
             expenditure_amount: ''
-          });
+        });
           setReceiptFile(null);
           setExistingReceiptUrl(null);
           if (fileInputRef.current) fileInputRef.current.value = '';
-        } else {
+      } else {
           setShowForm(false);
           setForm(emptyForm);
           setReceiptFile(null);
           setExistingReceiptUrl(null);
           if (fileInputRef.current) fileInputRef.current.value = '';
-        }
       }
-    } catch (error: any) {
+    }
+  } catch (error: any) {
       console.error(error);
       if (error?.message?.includes("Missing UPDATE policy")) {
         toast.error("You don't have permission to update. Ask Admin to add RLS UPDATE policy.");
-      } else if (error?.code === 'PGRST204' && error?.message?.includes('receipt_url')) {
+    } else if (error?.code === 'PGRST204' && error?.message?.includes('receipt_url')) {
         toast.error("Database column 'receipt_url' is missing. Please run the SQL command provided by the AI.");
-      } else if (error?.message?.includes("does not exist")) {
+    } else if (error?.message?.includes("does not exist")) {
         toast.error("Database table 'petty_cash' missing! Contact Admin to run SQL setup.");
-      } else {
+    } else {
         toast.error("Failed to save entry.");
-      }
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } finally {
+      setIsSubmitting(false);
+  }
+};
 
   // Sort State
   const [sortField, setSortField] = useState<'date' | 'category' | 'advance' | 'expenditure'>('date');
@@ -597,7 +704,7 @@ export const PettyCash = () => {
       const matchDate = (!dateRange.start || e.date >= dateRange.start) && 
                         (!dateRange.end || e.date <= dateRange.end);
       return matchCat && matchUser && matchDate;
-    });
+  });
 
     // Apply Sorting with Number casting
     result.sort((a, b) => {
@@ -608,34 +715,34 @@ export const PettyCash = () => {
       if (sortField === 'expenditure') comparison = (Number(a.expenditure_amount) || 0) - (Number(b.expenditure_amount) || 0);
       
       return sortDirection === 'asc' ? comparison : -comparison;
-    });
+  });
 
     return result;
-  }, [entries, filterCategory, filterUser, dateRange, sortField, sortDirection]);
+}, [entries, filterCategory, filterUser, dateRange, sortField, sortDirection]);
 
   const handleSort = (field: 'date' | 'category' | 'advance' | 'expenditure') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
+  } else {
       setSortField(field);
       setSortDirection('desc');
-    }
+  }
     setCurrentPage(1);
-  };
+};
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterCategory, filterUser, dateRange]);
+}, [filterCategory, filterUser, dateRange]);
 
   // Aggregate for Charts
   const chartDataByCategory = useMemo(() => {
     const map = new Map<string, number>();
     filteredEntries.forEach(e => {
       map.set(e.category, (map.get(e.category) || 0) + (Number(e.expenditure_amount) || 0));
-    });
+  });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).filter(i => i.value > 0);
-  }, [filteredEntries]);
+}, [filteredEntries]);
 
   const chartDataByDate = useMemo(() => {
     const map = new Map<string, {date: string, Advance: number, Expenditure: number}>();
@@ -648,151 +755,41 @@ export const PettyCash = () => {
       existing.Advance += (Number(e.advance_amount) || 0);
       existing.Expenditure += (Number(e.expenditure_amount) || 0);
       map.set(e.date, existing);
-    });
+  });
     return Array.from(map.values());
-  }, [filteredEntries]);
+}, [filteredEntries]);
 
   const uniqueUsers = useMemo(() => {
     const users = new Map<string, string>();
     entries.forEach(e => {
       const name = e.raised_by_name || e.raised_by_id || 'Unknown User';
       users.set(e.raised_by_id, name);
-    });
+  });
     return Array.from(users.entries()).map(([id, name]) => ({id, name}));
-  }, [entries]);
+}, [entries]);
 
   // Global totals (Using whole numbers for math precision)
   const globalAdvance = entries.reduce((sum, e) => {
     return sum + Math.round((Number(e.advance_amount) || 0) * 100);
-  }, 0) / 100;
+}, 0) / 100;
 
   const globalExpenditure = entries.reduce((sum, e) => {
     return sum + Math.round((Number(e.expenditure_amount) || 0) * 100);
-  }, 0) / 100;
+}, 0) / 100;
 
   // Filtered totals (Using whole numbers for math precision)
   const totalAdvance = filteredEntries.reduce((sum, e) => {
     return sum + Math.round((Number(e.advance_amount) || 0) * 100);
-  }, 0) / 100;
+}, 0) / 100;
 
   const totalExpenditure = filteredEntries.reduce((sum, e) => {
     return sum + Math.round((Number(e.expenditure_amount) || 0) * 100);
-  }, 0) / 100;
+}, 0) / 100;
 
   // Pagination
   const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
   const paginatedEntries = filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const SecureImage = ({ url, className, onLoaded, refreshTrigger }: { url: string, className?: string, onLoaded?: () => void, refreshTrigger?: number }) => {
-    const [imgSrc, setImgSrc] = useState<string | null>(null);
-    const [hasError, setHasError] = useState(false);
-    const [hasCalledOnLoaded, setHasCalledOnLoaded] = useState(false);
-
-    const handleLoaded = () => {
-      if (!hasCalledOnLoaded && onLoaded) {
-        setHasCalledOnLoaded(true);
-        onLoaded();
-      }
-    };
-
-    useEffect(() => {
-      setHasCalledOnLoaded(false);
-      setHasError(false);
-      if (!url) {
-        handleLoaded();
-        return;
-      }
-      let isMounted = true;
-
-      const fetchImg = async () => {
-        if (url.includes('sharepoint.com') || url.includes('1drv.ms')) {
-          try {
-             const base64Str = btoa(unescape(encodeURIComponent(url)));
-             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-             let token = "";
-             try {
-                token = await getGraphToken(false);
-             } catch (e) {
-                // Ignore token fetch error, we will try proxy
-             }
-             
-             let finalBlob: Blob | null = null;
-             if (token) {
-               try {
-                 const thumbRes = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem?$expand=thumbnails`, {
-                   headers: { Authorization: `Bearer ${token}` }
-                 });
-                 if (thumbRes.ok) {
-                    const driveItem = await thumbRes.json();
-                    let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
-                    if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
-                       downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
-                    }
-                    if (downloadUrl) {
-                      const imgRes = await fetch(downloadUrl);
-                      if (imgRes.ok) finalBlob = await imgRes.blob();
-                    }
-                 }
-                 if (!finalBlob) {
-                   const contentRes = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
-                     headers: { Authorization: `Bearer ${token}` }
-                   });
-                   if (contentRes.ok) finalBlob = await contentRes.blob();
-                 }
-               } catch (e) {
-                 console.warn("Graph fetch failed", e);
-               }
-             }
-             
-             if (!finalBlob) {
-               const proxyRes = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
-               if (proxyRes.ok) finalBlob = await proxyRes.blob();
-             }
-             
-             if (finalBlob && isMounted) {
-               setImgSrc(URL.createObjectURL(finalBlob));
-             } else {
-               if (isMounted) setImgSrc(url); // Fallback
-             }
-          } catch (e) {
-            console.error("Secure fetch failed completely", e);
-            if (isMounted) setImgSrc(url);
-          }
-        } else {
-           if (isMounted) setImgSrc(url);
-        }
-      };
-
-      fetchImg();
-
-      return () => { isMounted = false; };
-    }, [url, refreshTrigger]);
-
-    if (hasError) {
-       return (
-         <div className="bg-red-50 text-red-500 rounded p-4 flex flex-col items-center justify-center text-xs border border-red-200">
-           <p className="mb-2">Image failed to load</p>
-         </div>
-       );
-    }
-
-    if (!imgSrc) {
-       return <div className="animate-pulse bg-slate-200 dark:bg-slate-800 rounded h-32 w-32 flex items-center justify-center text-xs text-slate-500">Loading...</div>;
-    }
-
-    return (
-      <img 
-        src={imgSrc} 
-        alt="Receipt" 
-        className={className}
-        onLoad={handleLoaded}
-        onError={(e) => {
-          setHasError(true);
-          handleLoaded();
-        }}
-      />
-    );
-  };
 
   const totalReceiptsCount = useMemo(() => filteredEntries.filter(e => e.receipt_url).length, [filteredEntries]);
 
@@ -803,14 +800,14 @@ export const PettyCash = () => {
         setTimeout(() => {
           try {
             window.print();
-          } catch (e) {
+        } catch (e) {
             console.error("Print failed", e);
             toast.error("Printing might be blocked in this preview. Please open the app in a new tab to print.");
-          }
-        }, 500);
-      }
+        }
+      }, 500);
     }
-  }, [showPrintPreview, loadedImagesCount, totalReceiptsCount, autoPrintTriggered]);
+  }
+}, [showPrintPreview, loadedImagesCount, totalReceiptsCount, autoPrintTriggered]);
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500 print:p-0 print:m-0 print:max-w-none">
@@ -827,7 +824,7 @@ export const PettyCash = () => {
               setAutoPrintTriggered(false);
               setImageRefreshKey(prev => prev + 1);
               setShowPrintPreview(true);
-            }} 
+          }} 
             disabled={filteredEntries.length === 0}
             variant="outline" 
             className="font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
@@ -844,16 +841,25 @@ export const PettyCash = () => {
             {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
             Export to Word
           </Button>
+          <Button 
+            onClick={handleExportReceipts} 
+            disabled={isExportingReceipts || filteredEntries.length === 0}
+            variant="outline" 
+            className="font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          >
+            {isExportingReceipts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileImage className="w-4 h-4 mr-2" />}
+            Export Receipts
+          </Button>
           {(canCreate || showForm) && (
             <Button onClick={() => {
               if (showForm) {
                 setShowForm(false);
                 setEditingId(null);
                 setForm(emptyForm);
-              } else {
+            } else {
                 setShowForm(true);
-              }
-            }} className="bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
+            }
+          }} className="bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20">
               {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
               {showForm ? 'Cancel Form' : 'New Entry'}
             </Button>
@@ -992,7 +998,7 @@ export const PettyCash = () => {
                       if (inProgress !== "none") {
                         toast.info("Authentication is already in progress. Please wait.");
                         return;
-                      }
+                    }
                       
                       const width = 600;
                       const height = 700;
@@ -1005,8 +1011,8 @@ export const PettyCash = () => {
                           window.removeEventListener('message', receiveMessage);
                           setMsalReady(true);
                           toast.success("Successfully logged in to Microsoft");
-                        }
-                      };
+                      }
+                    };
                       window.addEventListener('message', receiveMessage);
                       
                       // Fallback interval just in case postMessage fails
@@ -1016,19 +1022,19 @@ export const PettyCash = () => {
                         if (attempts > 180) { // Stop after 3 mins
                           clearInterval(pollInterval);
                           return;
-                        }
+                      }
 
                         try {
                           if (instance.getAllAccounts().length > 0) {
                             clearInterval(pollInterval);
                             window.removeEventListener('message', receiveMessage);
                             setMsalReady(true);
-                          }
-                        } catch (err) {
-                          // Just ignore errors during polling
                         }
-                      }, 1500);
-                    }}
+                      } catch (err) {
+                          // Just ignore errors during polling
+                      }
+                    }, 1500);
+                  }}
                     className="border-[#0078D4] text-[#0078D4] hover:bg-[#0078D4]/5 dark:border-[#0078D4] dark:hover:bg-[#0078D4]/20"
                   >
                     Connect Microsoft Account
@@ -1160,7 +1166,7 @@ export const PettyCash = () => {
                         setFilterCategory('All');
                         setFilterUser('All');
                         setDateRange({start:'', end:''});
-                      }}
+                    }}
                       className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-wider"
                     >
                       Clear All
@@ -1246,8 +1252,8 @@ export const PettyCash = () => {
                           onClick={(data) => {
                             if (data && data.name) {
                               setFilterCategory(data.name === filterCategory ? 'All' : data.name);
-                            }
-                          }}
+                          }
+                        }}
                           className="cursor-pointer hover:opacity-80 transition-opacity"
                         >
                           {chartDataByCategory.map((entry, index) => (
@@ -1457,11 +1463,11 @@ export const PettyCash = () => {
                             setDateRange(prev => {
                               if (prev.start === state.activeLabel && prev.end === state.activeLabel) {
                                 return { start: '', end: '' }; // toggle off
-                              }
+                            }
                               return { start: state.activeLabel as string, end: state.activeLabel as string }; // filter to specific date
-                            });
-                          }
-                        }}
+                          });
+                        }
+                      }}
                         className="cursor-pointer"
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
@@ -1518,7 +1524,7 @@ export const PettyCash = () => {
                     setLoadedImagesCount(0);
                     setAutoPrintTriggered(false);
                     setImageRefreshKey(prev => prev + 1);
-                  }} 
+                }} 
                   variant="outline"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -1560,8 +1566,7 @@ export const PettyCash = () => {
             {entry.receipt_url && (
               <div className="mt-4">
                 <p className="font-semibold mb-2">Receipt:</p>
-                <SecureImage 
-                  url={entry.receipt_url} 
+                <SecureImage getGraphToken={getGraphToken} url={entry.receipt_url} 
                   className="max-w-full max-h-[500px] object-contain border border-slate-200 rounded"
                   onLoaded={() => setLoadedImagesCount(prev => prev + 1)}
                   refreshTrigger={imageRefreshKey}
@@ -1576,4 +1581,5 @@ export const PettyCash = () => {
       )}
     </div>
   );
-};
+
+}
