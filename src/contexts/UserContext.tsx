@@ -22,13 +22,40 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchCurrentUserProfile(session.user);
-      } else {
-        setLoading(false);
-      }
-    });
+    supabase.auth.getSession()
+      .then((res) => {
+        const session = res?.data?.session;
+        const error = res?.error;
+
+        if (error) {
+          console.error("Session fetch error:", error);
+          // If the refresh token is invalid or not found, sign out to clear storage
+          if (
+            error.message?.toLowerCase().includes('refresh token') ||
+            error.message?.toLowerCase().includes('invalid_grant') ||
+            error.message?.toLowerCase().includes('not found')
+          ) {
+            supabase.auth.signOut()
+              .finally(() => {
+                setLoading(false);
+              });
+            return;
+          }
+        }
+
+        if (session?.user) {
+          fetchCurrentUserProfile(session.user);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Critical error in getSession handler:", err);
+        supabase.auth.signOut()
+          .finally(() => {
+            setLoading(false);
+          });
+      });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

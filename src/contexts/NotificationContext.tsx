@@ -146,7 +146,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { data: admins } = await supabase
       .from('profiles')
       .select('id')
-      .eq('role', 'admin');
+      .in('role', ['admin', 'chief_sthapathy']);
 
     if (admins) {
       const newNotifications = admins.map(admin => ({
