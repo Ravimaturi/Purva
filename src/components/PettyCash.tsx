@@ -185,44 +185,31 @@ export const PettyCash = () => {
                originalBlob = await proxyResponse.blob();
              }
            }
+           
+           if (originalBlob.type.includes('text/html')) {
+             throw new Error("Fetched content is an HTML page (possibly a login redirect), not an image.");
+           }
 
-           const convertBlobToJpeg = (blob: Blob): Promise<Blob> => {
-             return new Promise((resolve, reject) => {
-               if (blob.type.includes('text/html')) {
-                 return reject(new Error("Fetched content is an HTML page (possibly a login redirect), not an image."));
-               }
-               const objUrl = URL.createObjectURL(blob);
-               const img = new Image();
-               img.onload = () => {
-                 const canvas = document.createElement('canvas');
-                 canvas.width = img.width;
-                 canvas.height = img.height;
-                 const ctx = canvas.getContext('2d');
-                 if (ctx) {
-                   ctx.fillStyle = "#ffffff";
-                   ctx.fillRect(0, 0, canvas.width, canvas.height);
-                   ctx.drawImage(img, 0, 0);
-                   canvas.toBlob((newBlob) => {
-                     URL.revokeObjectURL(objUrl);
-                     if (newBlob) resolve(newBlob);
-                     else reject(new Error("Canvas to Blob failed"));
-                   }, 'image/jpeg', 0.9);
-                 } else {
-                   URL.revokeObjectURL(objUrl);
-                   reject(new Error("Could not get canvas context"));
-                 }
-               };
-               img.onerror = () => {
-                 URL.revokeObjectURL(objUrl);
-                 reject(new Error(`Image load failed. Blob type: ${blob.type}, size: ${blob.size}`));
-               };
-               img.src = objUrl;
-             });
-           };
-
-           const jpegBlob = await convertBlobToJpeg(originalBlob);
+           const convertResponse = await fetch('/api/convert-image', {
+             method: 'POST',
+             body: originalBlob,
+             headers: {
+               'Content-Type': originalBlob.type || 'application/octet-stream'
+             }
+           });
+           
+           if (!convertResponse.ok) {
+             throw new Error(`Backend image conversion failed: ${convertResponse.statusText}`);
+           }
+           
+           const widthStr = convertResponse.headers.get('x-image-width');
+           const heightStr = convertResponse.headers.get('x-image-height');
+           const width = widthStr ? parseInt(widthStr, 10) : undefined;
+           const height = heightStr ? parseInt(heightStr, 10) : undefined;
+           
+           const jpegBlob = await convertResponse.blob();
            const arrayBuffer = await jpegBlob.arrayBuffer();
-           return { arrayBuffer, type: "jpg" as const };
+           return { arrayBuffer, type: "jpg" as const, width, height };
         } catch (error: any) {
           console.error("Error fetching image", error);
           toast.error(`Failed to load image: ${error.message}`);
