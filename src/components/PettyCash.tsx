@@ -8,7 +8,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer } from 'lucide-react';
+import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, Printer, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportPettyCashToWord } from '../lib/exportToWord';
 import {
@@ -145,6 +145,10 @@ export const PettyCash = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [loadedImagesCount, setLoadedImagesCount] = useState(0);
+  const [autoPrintTriggered, setAutoPrintTriggered] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Filters
@@ -679,18 +683,134 @@ export const PettyCash = () => {
   const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
   const paginatedEntries = filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const getPrintableImageUrl = (url: string) => {
-    if (!url) return '';
-    try {
-      const urlObj = new URL(url);
-      if (url.includes('sharepoint.com') || url.includes('1drv.ms')) {
-        urlObj.searchParams.set('download', '1');
+  const SecureImage = ({ url, className, onLoaded, refreshTrigger }: { url: string, className?: string, onLoaded?: () => void, refreshTrigger?: number }) => {
+    const [imgSrc, setImgSrc] = useState<string | null>(null);
+    const [hasError, setHasError] = useState(false);
+    const [hasCalledOnLoaded, setHasCalledOnLoaded] = useState(false);
+
+    const handleLoaded = () => {
+      if (!hasCalledOnLoaded && onLoaded) {
+        setHasCalledOnLoaded(true);
+        onLoaded();
       }
-      return urlObj.toString();
-    } catch (e) {
-      return url;
+    };
+
+    useEffect(() => {
+      setHasCalledOnLoaded(false);
+      setHasError(false);
+      if (!url) {
+        handleLoaded();
+        return;
+      }
+      let isMounted = true;
+
+      const fetchImg = async () => {
+        if (url.includes('sharepoint.com') || url.includes('1drv.ms')) {
+          try {
+             const base64Str = btoa(unescape(encodeURIComponent(url)));
+             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+             let token = "";
+             try {
+                token = await getGraphToken(false);
+             } catch (e) {
+                // Ignore token fetch error, we will try proxy
+             }
+             
+             let finalBlob: Blob | null = null;
+             if (token) {
+               try {
+                 const thumbRes = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem?$expand=thumbnails`, {
+                   headers: { Authorization: `Bearer ${token}` }
+                 });
+                 if (thumbRes.ok) {
+                    const driveItem = await thumbRes.json();
+                    let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
+                    if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
+                       downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
+                    }
+                    if (downloadUrl) {
+                      const imgRes = await fetch(downloadUrl);
+                      if (imgRes.ok) finalBlob = await imgRes.blob();
+                    }
+                 }
+                 if (!finalBlob) {
+                   const contentRes = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
+                     headers: { Authorization: `Bearer ${token}` }
+                   });
+                   if (contentRes.ok) finalBlob = await contentRes.blob();
+                 }
+               } catch (e) {
+                 console.warn("Graph fetch failed", e);
+               }
+             }
+             
+             if (!finalBlob) {
+               const proxyRes = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+               if (proxyRes.ok) finalBlob = await proxyRes.blob();
+             }
+             
+             if (finalBlob && isMounted) {
+               setImgSrc(URL.createObjectURL(finalBlob));
+             } else {
+               if (isMounted) setImgSrc(url); // Fallback
+             }
+          } catch (e) {
+            console.error("Secure fetch failed completely", e);
+            if (isMounted) setImgSrc(url);
+          }
+        } else {
+           if (isMounted) setImgSrc(url);
+        }
+      };
+
+      fetchImg();
+
+      return () => { isMounted = false; };
+    }, [url, refreshTrigger]);
+
+    if (hasError) {
+       return (
+         <div className="bg-red-50 text-red-500 rounded p-4 flex flex-col items-center justify-center text-xs border border-red-200">
+           <p className="mb-2">Image failed to load</p>
+         </div>
+       );
     }
+
+    if (!imgSrc) {
+       return <div className="animate-pulse bg-slate-200 dark:bg-slate-800 rounded h-32 w-32 flex items-center justify-center text-xs text-slate-500">Loading...</div>;
+    }
+
+    return (
+      <img 
+        src={imgSrc} 
+        alt="Receipt" 
+        className={className}
+        onLoad={handleLoaded}
+        onError={(e) => {
+          setHasError(true);
+          handleLoaded();
+        }}
+      />
+    );
   };
+
+  const totalReceiptsCount = useMemo(() => filteredEntries.filter(e => e.receipt_url).length, [filteredEntries]);
+
+  useEffect(() => {
+    if (showPrintPreview && !autoPrintTriggered) {
+      if (loadedImagesCount >= totalReceiptsCount) {
+        setAutoPrintTriggered(true);
+        setTimeout(() => {
+          try {
+            window.print();
+          } catch (e) {
+            console.error("Print failed", e);
+            toast.error("Printing might be blocked in this preview. Please open the app in a new tab to print.");
+          }
+        }, 500);
+      }
+    }
+  }, [showPrintPreview, loadedImagesCount, totalReceiptsCount, autoPrintTriggered]);
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto animate-in fade-in duration-500 print:p-0 print:m-0 print:max-w-none">
@@ -703,15 +823,10 @@ export const PettyCash = () => {
         <div className="flex items-center gap-3 mt-4 sm:mt-0 print:hidden">
           <Button 
             onClick={() => {
+              setLoadedImagesCount(0);
+              setAutoPrintTriggered(false);
+              setImageRefreshKey(prev => prev + 1);
               setShowPrintPreview(true);
-              setTimeout(() => {
-                try {
-                  window.print();
-                } catch (e) {
-                  console.error("Print failed", e);
-                  toast.error("Printing might be blocked in this preview. Please open the app in a new tab to print.");
-                }
-              }, 500);
             }} 
             disabled={filteredEntries.length === 0}
             variant="outline" 
@@ -1391,9 +1506,24 @@ export const PettyCash = () => {
             <div className="flex justify-between items-center mb-8 print:hidden">
               <div>
                 <h2 className="text-2xl font-bold text-black">Print Preview</h2>
-                <p className="text-slate-500 text-sm mt-1">If the print dialog didn't open automatically, press Ctrl+P / Cmd+P. <br/>If it's blocked, please open the app in a new tab using the icon in the top right.</p>
+                <p className="text-slate-500 text-sm mt-1">
+                  {loadedImagesCount < totalReceiptsCount 
+                    ? `Loading images (${loadedImagesCount}/${totalReceiptsCount})...` 
+                    : "If the print dialog didn't open automatically, press Ctrl+P / Cmd+P. If it's blocked, please open the app in a new tab using the icon in the top right."}
+                </p>
               </div>
               <div className="flex gap-4">
+                <Button 
+                  onClick={() => {
+                    setLoadedImagesCount(0);
+                    setAutoPrintTriggered(false);
+                    setImageRefreshKey(prev => prev + 1);
+                  }} 
+                  variant="outline"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Reload Images
+                </Button>
                 <Button onClick={() => window.print()} variant="default" className="bg-emerald-600 hover:bg-emerald-700">
                   <Printer className="w-4 h-4 mr-2" />
                   Print Now
@@ -1430,13 +1560,11 @@ export const PettyCash = () => {
             {entry.receipt_url && (
               <div className="mt-4">
                 <p className="font-semibold mb-2">Receipt:</p>
-                <img 
-                  src={getPrintableImageUrl(entry.receipt_url)} 
-                  alt="Receipt" 
+                <SecureImage 
+                  url={entry.receipt_url} 
                   className="max-w-full max-h-[500px] object-contain border border-slate-200 rounded"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
+                  onLoaded={() => setLoadedImagesCount(prev => prev + 1)}
+                  refreshTrigger={imageRefreshKey}
                 />
               </div>
             )}
