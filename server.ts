@@ -7,6 +7,34 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // API routes
+  app.get("/api/proxy-image", async (req, res) => {
+    try {
+      const imageUrl = req.query.url as string;
+      if (!imageUrl) {
+        res.status(400).send("No URL provided");
+        return;
+      }
+      
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        res.status(response.status).send(`Error fetching image: ${response.statusText}`);
+        return;
+      }
+      
+      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type');
+      if (contentType) {
+        res.setHeader('Content-Type', contentType);
+      }
+      // allow CORS if accessed directly, though it will be on same origin
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.send(Buffer.from(buffer));
+    } catch (error: any) {
+      res.status(500).send(`Server error: ${error.message}`);
+    }
+  });
+
   // Proxy for Supabase API to avoid mixed content and CORS issues
   app.use('/supabase-api', createProxyMiddleware({
     target: 'http://supabasekong-ffyoj28pwvhn7z3s2qjw010j.89.116.122.17.sslip.io',
