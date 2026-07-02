@@ -54,7 +54,7 @@ export const PettyCash = () => {
   const { instance, accounts, inProgress } = useMsal();
   const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
   
-  const getGraphClient = useCallback(async (interactive = false) => {
+  const getGraphToken = useCallback(async (interactive = false) => {
     let activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
     if (!activeAccount && interactive) {
       await instance.loginPopup(loginRequest);
@@ -79,13 +79,17 @@ export const PettyCash = () => {
          throw e;
       }
     }
-    
+    return token;
+  }, [instance]);
+
+  const getGraphClient = useCallback(async (interactive = false) => {
+    const token = await getGraphToken(interactive);
     return Client.init({
       authProvider: (done) => {
         done(null, token);
       }
     });
-  }, [instance]);
+  }, [getGraphToken]);
   
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
@@ -136,30 +140,47 @@ export const PettyCash = () => {
              const client = await getGraphClient(true);
              const shareId = "u!" + btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
              
-             // Get the driveItem using the sharing URL
-             const driveItem = await client.api(`/shares/${shareId}/driveItem`).get();
-             
              try {
-               // Try to download content directly using authenticated graph client to avoid CORS on download URL
-               const response = await client.api(`/shares/${shareId}/driveItem/content`).responseType(ResponseType.BLOB).get();
-               originalBlob = response as Blob;
-             } catch (err) {
-               console.warn("Direct graph content fetch failed, falling back to downloadUrl", err);
-               if (driveItem["@microsoft.graph.downloadUrl"]) {
-                 const response = await fetch(driveItem["@microsoft.graph.downloadUrl"]);
-                 originalBlob = await response.blob();
-               } else {
-                 throw new Error("Could not find download URL or content for image.");
+               // First try to get the large thumbnail which usually has CORS headers enabled
+               const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
+               let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
+               
+               if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
+                  // Prefer large thumbnail
+                  downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
                }
+
+               if (!downloadUrl) {
+                 throw new Error("Could not find download URL or thumbnail for image.");
+               }
+               
+               const response = await fetch(downloadUrl);
+               if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
+               originalBlob = await response.blob();
+             } catch (err) {
+               console.warn("Thumbnail fetch failed, trying direct content fetch", err);
+               const token = await getGraphToken(true);
+               const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
+                 headers: { Authorization: `Bearer ${token}` }
+               });
+               if (!response.ok) {
+                 throw new Error(`Direct graph content fetch failed with status ${response.status}`);
+               }
+               originalBlob = await response.blob();
              }
            } else {
              const response = await fetch(url, { mode: 'cors' });
-             if (!response.ok) return null;
+             if (!response.ok) {
+               throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+             }
              originalBlob = await response.blob();
            }
 
            const convertBlobToJpeg = (blob: Blob): Promise<Blob> => {
              return new Promise((resolve, reject) => {
+               if (blob.type.includes('text/html')) {
+                 return reject(new Error("Fetched content is an HTML page (possibly a login redirect), not an image."));
+               }
                const objUrl = URL.createObjectURL(blob);
                const img = new Image();
                img.onload = () => {
@@ -183,7 +204,7 @@ export const PettyCash = () => {
                };
                img.onerror = () => {
                  URL.revokeObjectURL(objUrl);
-                 reject(new Error("Image load failed"));
+                 reject(new Error(`Image load failed. Blob type: ${blob.type}, size: ${blob.size}`));
                };
                img.src = objUrl;
              });
@@ -192,8 +213,9 @@ export const PettyCash = () => {
            const jpegBlob = await convertBlobToJpeg(originalBlob);
            const arrayBuffer = await jpegBlob.arrayBuffer();
            return { arrayBuffer, type: "jpg" as const };
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error fetching image", error);
+          toast.error(`Failed to load image: ${error.message}`);
           return null;
         }
       };
