@@ -2,12 +2,38 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import sharp from "sharp";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   // API routes
+  app.post("/api/convert-image", express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
+    try {
+      if (!req.body) {
+        res.status(400).send("No body");
+        return;
+      }
+      
+      const image = sharp(req.body);
+      const metadata = await image.metadata();
+      const jpegBuffer = await image.jpeg({ quality: 90 }).toBuffer();
+      
+      res.setHeader('Content-Type', 'image/jpeg');
+      if (metadata.width && metadata.height) {
+        res.setHeader('X-Image-Width', metadata.width.toString());
+        res.setHeader('X-Image-Height', metadata.height.toString());
+      }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Image-Width, X-Image-Height');
+      res.send(jpegBuffer);
+    } catch (error: any) {
+      console.error("Convert image error:", error);
+      res.status(500).send(`Server error: ${error.message}`);
+    }
+  });
+
   app.get("/api/proxy-image", async (req, res) => {
     try {
       const imageUrl = req.query.url as string;
