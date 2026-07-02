@@ -15,7 +15,7 @@ export interface ExportEntry {
   receipt_url?: string;
 }
 
-export const exportPettyCashToWord = async (entries: ExportEntry[]) => {
+export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher?: (url: string) => Promise<{ arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp" } | null>) => {
   const children: any[] = [];
 
   children.push(
@@ -87,34 +87,44 @@ export const exportPettyCashToWord = async (entries: ExportEntry[]) => {
 
     if (entry.receipt_url) {
       try {
-        const response = await fetch(entry.receipt_url, { mode: 'cors' });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        let imageData: { arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp" } | null = null;
+        
+        if (imageFetcher) {
+          imageData = await imageFetcher(entry.receipt_url);
+        } else {
+          const response = await fetch(entry.receipt_url, { mode: 'cors' });
+          if (response.ok) {
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
+            if (blob.type.includes("png")) type = "png";
+            else if (blob.type.includes("gif")) type = "gif";
+            else if (blob.type.includes("bmp")) type = "bmp";
+            imageData = { arrayBuffer, type };
+          } else {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
         }
-        
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        
-        let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
-        if (blob.type.includes("png")) type = "png";
-        else if (blob.type.includes("gif")) type = "gif";
-        else if (blob.type.includes("bmp")) type = "bmp";
 
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [
-              new ImageRun({
-                data: arrayBuffer,
-                transformation: {
-                  width: 400,
-                  height: 400,
-                },
-                type: type,
-              }),
-            ],
-          })
-        );
+        if (imageData) {
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new ImageRun({
+                  data: imageData.arrayBuffer,
+                  transformation: {
+                    width: 400,
+                    height: 400,
+                  },
+                  type: imageData.type,
+                }),
+              ],
+            })
+          );
+        } else {
+           throw new Error("No image data returned");
+        }
       } catch (error) {
         console.error(`Failed to load image for entry ${entry.id}`, error);
         children.push(
