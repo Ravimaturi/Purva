@@ -54,20 +54,35 @@ export const PettyCash = () => {
   const { instance, accounts, inProgress } = useMsal();
   const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
   
-  const getGraphClient = useCallback(async () => {
-    const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+  const getGraphClient = useCallback(async (interactive = false) => {
+    let activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+    if (!activeAccount && interactive) {
+      await instance.loginPopup(loginRequest);
+      activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+    }
     if (!activeAccount) {
       throw new Error("Not logged into Microsoft. Please authenticate.");
     }
     
-    const response = await instance.acquireTokenSilent({
-      ...loginRequest,
-      account: activeAccount
-    });
+    let token = "";
+    try {
+      const response = await instance.acquireTokenSilent({
+        ...loginRequest,
+        account: activeAccount
+      });
+      token = response.accessToken;
+    } catch (e: any) {
+      if (interactive && (e.name === "InteractionRequiredAuthError" || e.errorCode === "interaction_required")) {
+         const response = await instance.acquireTokenPopup(loginRequest);
+         token = response.accessToken;
+      } else {
+         throw e;
+      }
+    }
     
     return Client.init({
       authProvider: (done) => {
-        done(null, response.accessToken);
+        done(null, token);
       }
     });
   }, [instance]);
@@ -114,7 +129,47 @@ export const PettyCash = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await exportPettyCashToWord(filteredEntries);
+      const fetchImage = async (url: string) => {
+        try {
+           if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
+             const client = await getGraphClient(true);
+             const shareId = "u!" + btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+             
+             // Get the driveItem using the sharing URL
+             const driveItem = await client.api(`/shares/${shareId}/driveItem`).get();
+             
+             // The response usually contains a @microsoft.graph.downloadUrl property that doesn't need auth,
+             // or we can fetch the content directly via /content
+             if (driveItem["@microsoft.graph.downloadUrl"]) {
+               const response = await fetch(driveItem["@microsoft.graph.downloadUrl"]);
+               const blob = await response.blob();
+               const arrayBuffer = await blob.arrayBuffer();
+               let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
+               if (blob.type.includes("png")) type = "png";
+               else if (blob.type.includes("gif")) type = "gif";
+               else if (blob.type.includes("bmp")) type = "bmp";
+               return { arrayBuffer, type };
+             }
+
+             throw new Error("Could not find download URL for image.");
+           } else {
+             const response = await fetch(url, { mode: 'cors' });
+             if (!response.ok) return null;
+             const blob = await response.blob();
+             const arrayBuffer = await blob.arrayBuffer();
+             let type: "jpg" | "png" | "gif" | "bmp" = "jpg";
+             if (blob.type.includes("png")) type = "png";
+             else if (blob.type.includes("gif")) type = "gif";
+             else if (blob.type.includes("bmp")) type = "bmp";
+             return { arrayBuffer, type };
+           }
+        } catch (error) {
+          console.error("Error fetching image", error);
+          return null;
+        }
+      };
+
+      await exportPettyCashToWord(filteredEntries, fetchImage);
       toast.success('Export completed successfully');
     } catch (err) {
       console.error(err);
