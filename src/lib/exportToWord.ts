@@ -123,7 +123,17 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
             })
           );
         } else {
-           throw new Error("No image data returned");
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: "[Receipt Image Unavailable]",
+                  color: "FF0000",
+                }),
+              ],
+            })
+          );
         }
       } catch (error) {
         console.error(`Failed to load image for entry ${entry.id}`, error);
