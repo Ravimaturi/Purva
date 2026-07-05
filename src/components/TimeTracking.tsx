@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Profile, Project, hasAdminAccess } from '../types';
+import { Profile, Project,  } from '../types';
 import { useUser } from '../contexts/UserContext';
+import { useFileSettings } from '../contexts/FileSettingsContext';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { SalaryManagement } from './SalaryManagement';
+
 import { Loader2, Calendar, UserIcon, Clock, FileText, Briefcase, Plus, Trash2 } from 'lucide-react';
 
 export const TimeTracking: React.FC = () => {
   const { user } = useUser();
+  const { canManageSalaries, canManageTimeTracking } = useFileSettings();
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<Profile[]>([]);
   const [timeLogs, setTimeLogs] = useState<any[]>([]);
@@ -165,7 +170,16 @@ export const TimeTracking: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+      <Tabs defaultValue="log" className="w-full">
+        <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6 inline-flex">
+          <TabsTrigger value="log" className="rounded-lg px-6">Log Hours</TabsTrigger>
+          {canManageSalaries(user?.role, 'manage') && (
+            <TabsTrigger value="salaries" className="rounded-lg px-6">Salary Management</TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="log" className="space-y-6 m-0">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
         <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-2">
           <Clock className="w-5 h-5 text-indigo-500" />
           Log Hours
@@ -316,7 +330,7 @@ export const TimeTracking: React.FC = () => {
                 <th className="p-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Project</th>
                 <th className="p-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Activity</th>
                 <th className="p-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Hours</th>
-                {hasAdminAccess(user?.role) && (
+                {canManageSalaries(user?.role, 'manage') && (
                   <th className="p-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Cost (₹)</th>
                 )}
                 <th className="p-4"></th>
@@ -348,13 +362,13 @@ export const TimeTracking: React.FC = () => {
                     <td className="p-4 text-sm font-bold text-slate-900 dark:text-white text-right">
                       {log.hours_logged}h
                     </td>
-                    {hasAdminAccess(user?.role) && (
+                    {canManageSalaries(user?.role, 'manage') && (
                       <td className="p-4 text-sm text-amber-600 dark:text-amber-500 font-bold text-right">
                         ₹{log.total_cost?.toLocaleString('en-IN') || '0'}
                       </td>
                     )}
                     <td className="p-4 text-right">
-                      {(hasAdminAccess(user?.role) || log.user_id === user?.id) && (
+                      {(canManageTimeTracking(user?.role, 'delete') || log.user_id === user?.id) && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -372,6 +386,14 @@ export const TimeTracking: React.FC = () => {
           </table>
         </div>
       </div>
+        </TabsContent>
+        
+        {canManageSalaries(user?.role, 'manage') && (
+          <TabsContent value="salaries" className="m-0">
+            <SalaryManagement />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 };

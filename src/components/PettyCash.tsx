@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
-import { loginRequest } from '../lib/msalConfig';
+import { loginRequest, msalConfig } from '../lib/msalConfig';
+import { PublicClientApplication } from '@azure/msal-browser';
 import { Client, ResponseType } from '@microsoft/microsoft-graph-client';
 import { supabase } from '../lib/supabase';
 import { useUser } from '../contexts/UserContext';
@@ -8,9 +9,9 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFileSettings } from '../contexts/FileSettingsContext';
 import { hasAdminAccess } from '../types';
 import { Button } from './ui/button';
-import { Plus, Filter, Download, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, RefreshCw, } from 'lucide-react';
+import { Plus, Filter, Download, Printer, ArrowDown, ArrowUp, Calendar as CalendarIcon, User as UserIcon, X, Loader2, Pencil, Paperclip, ExternalLink, RefreshCw, } from 'lucide-react';
 import { toast } from 'sonner';
-import { exportPettyCashToWord } from '../lib/exportToWord';
+import { exportPettyCashToPrint } from '../lib/exportToHtml';
 import {
   BarChart,
   Bar,
@@ -65,6 +66,18 @@ export function PettyCash() {
       const receiveMessage = async (event: MessageEvent) => {
         if (typeof event.data === 'string' && event.data === 'msal_login_success') {
           window.removeEventListener('message', receiveMessage);
+          
+          try {
+            const tempInstance = new PublicClientApplication(msalConfig);
+            await tempInstance.initialize();
+            const accounts = tempInstance.getAllAccounts();
+            if (accounts.length > 0) {
+              instance.setActiveAccount(accounts[0]);
+            }
+          } catch (e) {
+            console.error("Failed to sync MSAL accounts:", e);
+          }
+          
           resolve();
       }
     };
@@ -183,86 +196,100 @@ export function PettyCash() {
 
   const handleExport = async () => {
     setIsExporting(true);
+    
+    // Open the window immediately in the click handler to avoid popup blockers
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+       toast.error("Please allow popups for this site to print receipts.");
+       setIsExporting(false);
+       return;
+    }
+    printWindow.document.write("<html><head><title>Loading Receipts...</title></head><body style='font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;'><h2>Loading receipts for print, please wait...</h2></body></html>");
+    
+    let msAuthFailed = false;
+    let failedImages = 0;
     try {
       const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
       if (hasSharepointLinks) {
          try {
            await getGraphToken(true);
-       } catch (e: any) {
+         } catch (e: any) {
            console.warn("Failed to acquire MSAL token interactively upfront:", e);
+           msAuthFailed = true;
            toast.error(`Microsoft Auth failed: ${e.message}`);
-       }
-    }
+         }
+      }
 
       const fetchImage = async (url: string) => {
         try {
            let originalBlob: Blob;
            
            if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
+             if (msAuthFailed) {
+                 throw new Error("Not logged into Microsoft. Please authenticate.");
+             }
              const client = await getGraphClient(false);
              const base64Str = btoa(unescape(encodeURIComponent(url)));
              const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
              
              try {
-               // First try to get the large thumbnail which usually has CORS headers enabled
                const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
                let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
                
                if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
-                  // Prefer large thumbnail
                   downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
-             }
-
+               }
+               
                if (!downloadUrl) {
                  throw new Error("Could not find download URL or thumbnail for image.");
-             }
+               }
                
                const response = await fetch(downloadUrl);
                if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
                originalBlob = await response.blob();
-           } catch (err) {
+             } catch (err) {
                console.warn("Thumbnail fetch failed, trying direct content fetch", err);
                const token = await getGraphToken(false);
                const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
                  headers: { Authorization: `Bearer ${token}` }
-             });
+               });
                if (!response.ok) {
                  throw new Error(`Direct graph content fetch failed with status ${response.status}`);
-             }
+               }
                originalBlob = await response.blob();
-           }
-         } else {
+             }
+           } else {
              try {
                const response = await fetch(url, { mode: 'cors' });
                if (!response.ok) {
                  throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-             }
+               }
                originalBlob = await response.blob();
-           } catch (fetchError) {
+             } catch (fetchError) {
                console.warn("Direct fetch failed, trying proxy", fetchError);
                const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
                if (!proxyResponse.ok) {
                  throw new Error(`Failed to fetch image via proxy: ${proxyResponse.status} ${proxyResponse.statusText}`);
-             }
+               }
                originalBlob = await proxyResponse.blob();
+             }
            }
-         }
            
            if (originalBlob.type.includes('text/html')) {
              throw new Error("Fetched content is an HTML page (possibly a login redirect), not an image.");
-         }
+           }
 
            const convertResponse = await fetch('/api/convert-image', {
              method: 'POST',
              body: originalBlob,
              headers: {
                'Content-Type': originalBlob.type || 'application/octet-stream'
-           }
-         });
+             }
+           });
            
            if (!convertResponse.ok) {
              throw new Error(`Backend image conversion failed: ${convertResponse.statusText}`);
-         }
+           }
            
            const widthStr = convertResponse.headers.get('x-image-width');
            const heightStr = convertResponse.headers.get('x-image-height');
@@ -272,23 +299,29 @@ export function PettyCash() {
            const jpegBlob = await convertResponse.blob();
            const arrayBuffer = await jpegBlob.arrayBuffer();
            return { arrayBuffer, type: "jpg" as const, width, height };
-      } catch (error: any) {
+        } catch (error: any) {
           console.error("Error fetching image", error);
-          toast.error(`Failed to load image: ${error.message}`);
+          failedImages++;
           return null;
+        }
+      };
+
+      await exportPettyCashToPrint(filteredEntries, fetchImage, printWindow);
+      if (failedImages > 0) {
+        toast.warning(`Export completed, but ${failedImages} images failed to load.`);
+      } else {
+        toast.success('Export completed successfully');
       }
-    };
-
-      await exportPettyCashToWord(filteredEntries, fetchImage);
-      toast.success('Export completed successfully');
-  } catch (err) {
+    } catch (err) {
       console.error(err);
-      toast.error('Failed to export to Word');
-  } finally {
+      if (printWindow) {
+         printWindow.document.body.innerHTML = "<h2>Failed to load receipts for printing. Please try again.</h2>";
+      }
+      toast.error('Failed to export to Print');
+    } finally {
       setIsExporting(false);
-  }
-};
-
+    }
+  };
   useEffect(() => {
     fetchQueries();
 }, [dateRange.start, dateRange.end]);
@@ -543,7 +576,7 @@ export function PettyCash() {
           const advAmt = data[0].advance_amount ? `Rs. ${data[0].advance_amount}` : '';
           const amtStr = expAmt ? `Expense: ${expAmt}` : (advAmt ? `Advance: ${advAmt}` : '');
           const notificationTitle = `New Petty Cash Entry: ${data[0].bill_name || data[0].category}`;
-          const notificationMessage = `${amtStr} | Reason: ${data[0].reason || 'N/A'} | Paid By: ${data[0].raised_by_name || 'N/A'}`;
+          const notificationMessage = `Project: ${data[0].project_name || 'N/A'} | ${amtStr} | Reason: ${data[0].reason || 'N/A'} | Paid By: ${data[0].raised_by_name || 'N/A'}`;
           
           await addNotification(notificationTitle, notificationMessage);
       }
@@ -700,8 +733,8 @@ export function PettyCash() {
             variant="outline" 
             className="font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
           >
-            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            Export to Word
+            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4 mr-2" />}
+            Export for PDF
           </Button>
           
           {(canCreate || showForm) && (

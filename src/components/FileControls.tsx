@@ -400,6 +400,8 @@ export const FileControls = () => {
       | "vendors"
       | "pettyCash"
       | "assets"
+      | "timeTracking"
+      | "salaryManagement"
       | "dashboard"
       | "backups",
     action: "create" | "edit" | "delete" | "view" | "manage",
@@ -436,6 +438,8 @@ export const FileControls = () => {
       | "vendors"
       | "pettyCash"
       | "assets"
+      | "timeTracking"
+      | "salaryManagement"
       | "dashboard"
       | "backups";
     action: "create" | "edit" | "delete" | "view" | "manage";
@@ -949,6 +953,48 @@ export const FileControls = () => {
                       Delete Assets
                     </h4>
                     <FeatureRoleToggles feature="assets" action="delete" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Tracking */}
+              <div className="p-6 space-y-6 border-t border-slate-100 dark:border-white/5">
+                <h3 className="text-md font-bold text-slate-900 dark:text-white flex items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  Time Tracking
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300 mb-2">
+                      Log Hours (Create)
+                    </h4>
+                    <FeatureRoleToggles feature="timeTracking" action="create" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300 mb-2">
+                      Edit Time Logs
+                    </h4>
+                    <FeatureRoleToggles feature="timeTracking" action="edit" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400 mb-2">
+                      Delete Time Logs
+                    </h4>
+                    <FeatureRoleToggles feature="timeTracking" action="delete" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Management */}
+              <div className="p-6 space-y-6 border-t border-slate-100 dark:border-white/5">
+                <h3 className="text-md font-bold text-slate-900 dark:text-white flex items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  Salary Management
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300 mb-2">
+                      Manage Salaries
+                    </h4>
+                    <FeatureRoleToggles feature="salaryManagement" action="manage" />
                   </div>
                 </div>
               </div>

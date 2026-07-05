@@ -69,8 +69,7 @@ export const TeamManagement: React.FC = () => {
     emp_code: '',
     designation: '',
     DOJ: '',
-    hourly_rate: '',
-    effective_date: new Date().toISOString().split('T')[0]
+    
   });
 
   // Sorting state
@@ -105,22 +104,6 @@ export const TeamManagement: React.FC = () => {
   const handleEditClick = async (user: Profile) => {
     setSelectedUser(user);
     
-    // Fetch latest hourly rate
-    let latestRate = '';
-    try {
-      const { data } = await supabase
-        .from('team_rates_history')
-        .select('hourly_rate')
-        .eq('user_id', user.id)
-        .order('effective_date', { ascending: false })
-        .limit(1);
-      if (data && data.length > 0) {
-        latestRate = data[0].hourly_rate.toString();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
     setEditData({
       full_name: user.full_name,
       email: user.email,
@@ -128,8 +111,7 @@ export const TeamManagement: React.FC = () => {
       emp_code: user.emp_code || '',
       designation: user.designation || '',
       DOJ: user.DOJ || '',
-      hourly_rate: latestRate,
-      effective_date: new Date().toISOString().split('T')[0]
+      
     });
     setIsEditDialogOpen(true);
   };
@@ -146,30 +128,6 @@ export const TeamManagement: React.FC = () => {
         .eq('id', selectedUser.id);
 
       if (error) throw error;
-
-      // Upsert rate if provided
-      if (hourly_rate) {
-        const rateVal = parseFloat(hourly_rate);
-        if (!isNaN(rateVal)) {
-          // Find existing rate for this date
-          const { data: existing } = await supabase
-            .from('team_rates_history')
-            .select('id')
-            .eq('user_id', selectedUser.id)
-            .eq('effective_date', effective_date)
-            .maybeSingle();
-
-          if (existing) {
-            await supabase.from('team_rates_history').update({ hourly_rate: rateVal }).eq('id', existing.id);
-          } else {
-            await supabase.from('team_rates_history').insert([{
-              user_id: selectedUser.id,
-              hourly_rate: rateVal,
-              effective_date: effective_date
-            }]);
-          }
-        }
-      }
 
       toast.success('User updated successfully');
       setIsEditDialogOpen(false);
@@ -562,29 +520,7 @@ export const TeamManagement: React.FC = () => {
               </Select>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="hourly_rate" className="text-xs font-bold uppercase tracking-widest text-slate-400">Hourly Rate (₹)</Label>
-                <Input 
-                  id="hourly_rate" 
-                  type="number"
-                  step="0.01"
-                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
-                  value={editData.hourly_rate}
-                  onChange={(e) => setEditData({ ...editData, hourly_rate: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="effective_date" className="text-xs font-bold uppercase tracking-widest text-slate-400">Rate Effective Date</Label>
-                <Input 
-                  id="effective_date" 
-                  type="date"
-                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
-                  value={editData.effective_date}
-                  onChange={(e) => setEditData({ ...editData, effective_date: e.target.value })}
-                />
-              </div>
-            </div>
+
             <DialogFooter className="pt-4 flex sm:justify-between items-center w-full border-t border-slate-100 dark:border-slate-800/60 mt-4">
               {selectedUser ? (
                 <Button 

@@ -73,7 +73,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const { notifications, unreadCount, markAsRead, markAllAsRead } =
     useNotifications();
   const { language, setLanguage, t, translateData } = useLanguage();
-  const { canViewDashboard, canManageBackups } = useFileSettings();
+  const { canViewDashboard, canManageBackups, canManageTimeTracking, canManageSalaries } = useFileSettings();
   const [showHistory, setShowHistory] = React.useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
@@ -95,7 +95,6 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
-        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "vendors", label: t("vendors"), icon: Building2 },
         { id: "team", label: t("team"), icon: UsersIcon },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
@@ -107,7 +106,6 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
-        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "vendors", label: t("vendors"), icon: Building2 },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
         { id: "assets", label: "Assets", icon: Briefcase },
@@ -124,7 +122,6 @@ export const Layout: React.FC<LayoutProps> = ({
         { id: "kanban", label: t("kanban"), icon: Trello },
         { id: "projects", label: t("projects"), icon: ListTodo },
         { id: "calendar", label: t("calendar"), icon: CalendarIcon },
-        { id: "time_tracking", label: "Time Tracking", icon: CalendarIcon },
         { id: "petty_cash", label: t("petty_cash"), icon: IndianRupee },
       ];
     }
@@ -134,6 +131,16 @@ export const Layout: React.FC<LayoutProps> = ({
         id: "dashboard",
         label: t("dashboard"),
         icon: LayoutDashboard,
+      });
+    }
+
+    if (canManageTimeTracking(role, 'create') || canManageTimeTracking(role, 'delete')) {
+      // Find a good spot to insert it, or just push it before team/assets.
+      // Let's just push it
+      baseItems.push({
+        id: "time_tracking",
+        label: "Time Tracking",
+        icon: CalendarIcon,
       });
     }
 
