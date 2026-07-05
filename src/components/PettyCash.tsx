@@ -55,93 +55,124 @@ export function PettyCash() {
   const { instance, accounts, inProgress } = useMsal();
   const [msalReady, setMsalReady] = useState(() => instance.getAllAccounts().length > 0);
   
-  const customInteractiveLogin = () => {
+  
+  const customInteractiveLogin = async () => {
     return new Promise<void>((resolve, reject) => {
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      window.open(`${window.location.origin}?auth_action=login`, 'oauth_popup', `width=${width},height=${height},left=${left},top=${top}`);
+      let isDone = false;
       
-      const receiveMessage = async (event: MessageEvent) => {
-        if (typeof event.data === 'string' && event.data === 'msal_login_success') {
-          window.removeEventListener('message', receiveMessage);
-          
-          try {
-            const tempInstance = new PublicClientApplication(msalConfig);
-            await tempInstance.initialize();
-            const accounts = tempInstance.getAllAccounts();
-            if (accounts.length > 0) {
-              instance.setActiveAccount(accounts[0]);
-            }
-          } catch (e) {
-            console.error("Failed to sync MSAL accounts:", e);
+      instance.loginPopup({
+        ...loginRequest,
+        prompt: 'select_account'
+      }).then(response => {
+        if (!isDone) {
+          isDone = true;
+          if (response && response.account) {
+            instance.setActiveAccount(response.account);
           }
-          
           resolve();
-      }
-    };
-      window.addEventListener('message', receiveMessage);
-      
-      let attempts = 0;
-      const pollInterval = setInterval(() => {
-        attempts++;
-        if (attempts > 180) {
-          clearInterval(pollInterval);
-          window.removeEventListener('message', receiveMessage);
-          reject(new Error("Authentication popup timed out"));
-          return;
-      }
-        if (instance.getAllAccounts().length > 0) {
-          clearInterval(pollInterval);
-          window.removeEventListener('message', receiveMessage);
-          resolve();
-      }
-    }, 1500);
-  });
-};
+        }
+      }).catch(e => {
+        if (!isDone) {
+          if (e.message && e.message.includes('timed_out')) {
+            const accounts = instance.getAllAccounts();
+            if (accounts.length > 0) {
+               instance.setActiveAccount(accounts[0]);
+               isDone = true;
+               resolve();
+               return;
+            }
+          }
+          isDone = true;
+          console.error("MSAL loginPopup failed:", e);
+          toast.error("Microsoft Auth failed: " + e.message);
+          reject(e);
+        }
+      });
 
+      // Poll in case postMessage fails (e.g. inside iframe)
+      const interval = setInterval(() => {
+        if (isDone) {
+          clearInterval(interval);
+          return;
+        }
+        const accounts = instance.getAllAccounts();
+        if (accounts.length > 0) {
+          isDone = true;
+          clearInterval(interval);
+          instance.setActiveAccount(accounts[0]);
+          resolve();
+        }
+      }, 1000);
+    });
+  };
 
   const getGraphToken = useCallback(async (interactive = false) => {
     let activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
     if (!activeAccount && interactive) {
       await customInteractiveLogin();
       activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-  }
+    }
     if (!activeAccount) {
       throw new Error("Not logged into Microsoft. Please authenticate.");
-  }
+    }
     
     try {
       const response = await instance.acquireTokenSilent({
         ...loginRequest,
         account: activeAccount
-    });
+      });
       return response.accessToken;
-  } catch (e: any) {
+    } catch (e: any) {
       console.warn("Silent token acquisition failed:", e);
       if (interactive) {
-         try {
-           const popupResponse = await instance.acquireTokenPopup({
-             ...loginRequest,
-             account: activeAccount
+         return new Promise<string>((resolve, reject) => {
+            let isDone = false;
+            
+            instance.acquireTokenPopup({
+                ...loginRequest,
+                account: activeAccount
+            }).then(popupResponse => {
+                if (!isDone) {
+                    isDone = true;
+                    resolve(popupResponse.accessToken);
+                }
+            }).catch(popupErr => {
+                if (!isDone) {
+                    if (popupErr.message && popupErr.message.includes('timed_out')) {
+                       // Handled by polling
+                    } else {
+                       isDone = true;
+                       console.warn("Popup token acquisition failed:", popupErr);
+                       toast.error("Microsoft Auth failed: " + popupErr.message);
+                       reject(popupErr);
+                    }
+                }
+            });
+            
+            // Poll for silent token success
+            const interval = setInterval(async () => {
+                if (isDone) {
+                    clearInterval(interval);
+                    return;
+                }
+                try {
+                    const response = await instance.acquireTokenSilent({
+                        ...loginRequest,
+                        account: activeAccount
+                    });
+                    isDone = true;
+                    clearInterval(interval);
+                    resolve(response.accessToken);
+                } catch (silentErr) {
+                    // Ignore and keep polling
+                }
+            }, 1500);
          });
-           return popupResponse.accessToken;
-       } catch (popupErr) {
-           console.warn("Popup token acquisition failed, falling back to custom logic:", popupErr);
-           await customInteractiveLogin();
-           activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-           const response = await instance.acquireTokenSilent({
-             ...loginRequest,
-             account: activeAccount
-         });
-           return response.accessToken;
-       }
-    } else {
+      } else {
          throw e;
+      }
     }
-  }
-}, [instance]);
+  }, [instance]);
 
   const getGraphClient = useCallback(async (interactive = false) => {
     const token = await getGraphToken(interactive);
@@ -193,120 +224,193 @@ export function PettyCash() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const handleMicrosoftLogout = () => {
+    try {
+      const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+      if (activeAccount) {
+        instance.logoutPopup({ account: activeAccount }).then(() => {
+          toast.success("Logged out of Microsoft.");
+        }).catch(() => {
+          instance.clearCache();
+          window.location.reload();
+        });
+      } else {
+        instance.clearCache();
+        toast.success("Microsoft Auth Cache cleared.");
+      }
+    } catch (e) {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.reload();
+    }
+  };
+
 
   const handleExport = async () => {
     setIsExporting(true);
     
-    // Open the window immediately in the click handler to avoid popup blockers
+    let msAuthFailed = false;
+    const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
+    
+    if (hasSharepointLinks) {
+       try {
+         toast.info("Authenticating with Microsoft to access SharePoint images...");
+         // Attempt to get token BEFORE opening the print window, as it might open a popup
+         await getGraphToken(true);
+         toast.success("Microsoft Authentication successful!");
+       } catch (e: any) {
+         console.warn("Failed to acquire MSAL token interactively upfront:", e);
+         msAuthFailed = true;
+         toast.error(`Microsoft Auth failed: ${e.message}`);
+       }
+    }
+
+    // Open the window after auth (might trigger popup blocker if MSAL took too long, but MSAL handles popups best immediately)
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
        toast.error("Please allow popups for this site to print receipts.");
        setIsExporting(false);
        return;
     }
-    printWindow.document.write("<html><head><title>Loading Receipts...</title></head><body style='font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;'><h2>Loading receipts for print, please wait...</h2></body></html>");
+    printWindow.document.write("<html><head><title>Loading Receipts...</title></head><body style='font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #f8fafc;'><h2>Loading receipts for print...</h2><p style='color: #64748b; margin-top: 10px;' id='loading-status'>Initializing export process...</p><div style='margin-top: 20px; width: 300px; height: 6px; background-color: #e2e8f0; border-radius: 3px; overflow: hidden;'><div id='loading-progress-bar' style='width: 0%; height: 100%; background-color: #3b82f6; transition: width 0.3s ease;'></div></div></body></html>");
     
-    let msAuthFailed = false;
     let failedImages = 0;
     try {
-      const hasSharepointLinks = filteredEntries.some(e => e.receipt_url?.includes("sharepoint.com") || e.receipt_url?.includes("1drv.ms"));
-      if (hasSharepointLinks) {
-         try {
-           await getGraphToken(true);
-         } catch (e: any) {
-           console.warn("Failed to acquire MSAL token interactively upfront:", e);
-           msAuthFailed = true;
-           toast.error(`Microsoft Auth failed: ${e.message}`);
-         }
-      }
-
-      const fetchImage = async (url: string) => {
-        try {
-           let originalBlob: Blob;
-           
-           if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
-             if (msAuthFailed) {
-                 throw new Error("Not logged into Microsoft. Please authenticate.");
-             }
-             const client = await getGraphClient(false);
-             const base64Str = btoa(unescape(encodeURIComponent(url)));
-             const shareId = "u!" + base64Str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-             
-             try {
-               const driveItem = await client.api(`/shares/${shareId}/driveItem?$expand=thumbnails`).get();
-               let downloadUrl = driveItem["@microsoft.graph.downloadUrl"];
-               
-               if (driveItem.thumbnails && driveItem.thumbnails.length > 0) {
-                  downloadUrl = driveItem.thumbnails[0].large?.url || driveItem.thumbnails[0].medium?.url || downloadUrl;
-               }
-               
-               if (!downloadUrl) {
-                 throw new Error("Could not find download URL or thumbnail for image.");
-               }
-               
-               const response = await fetch(downloadUrl);
-               if (!response.ok) throw new Error(`Image fetch failed with status ${response.status}`);
-               originalBlob = await response.blob();
-             } catch (err) {
-               console.warn("Thumbnail fetch failed, trying direct content fetch", err);
-               const token = await getGraphToken(false);
-               const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
-                 headers: { Authorization: `Bearer ${token}` }
-               });
-               if (!response.ok) {
-                 throw new Error(`Direct graph content fetch failed with status ${response.status}`);
-               }
-               originalBlob = await response.blob();
-             }
-           } else {
+      const fetchImagesBatch = async (urls: string[]) => {
+        const results: Record<string, any> = {};
+        const graphUrls = urls.filter(u => u.includes("sharepoint.com") || u.includes("1drv.ms"));
+        const otherUrls = urls.filter(u => !u.includes("sharepoint.com") && !u.includes("1drv.ms"));
+        
+        // 1. Batch Request to Graph API
+        if (graphUrls.length > 0) {
+          try {
+            if (msAuthFailed) {
+              console.warn("Skipping MSAL image fetch because auth failed.");
+            } else {
+              const token = await getGraphToken(false);
+              
+              // Chunk requests to 20 per batch per Graph API limits
+              const chunkSize = 20;
+              for (let i = 0; i < graphUrls.length; i += chunkSize) {
+                const chunk = graphUrls.slice(i, i + chunkSize);
+                
+                const requests = chunk.map((url, index) => {
+                   // Clean up URL and use standard base64 encoding with utf8 support
+                   let cleanUrl = url;
+                   try {
+                     const urlObj = new URL(url);
+                     urlObj.search = ''; 
+                     cleanUrl = urlObj.toString();
+                   } catch (e) {}
+                   
+                   // Properly encode sharing link
+                   const base64 = btoa(unescape(encodeURIComponent(cleanUrl))).replace(/=/g, '').replace(/\//g, '_').replace(/\+/g, '-');
+                   const token = `u!${base64}`;
+                   
+                   return {
+                     id: index.toString(),
+                     method: "GET",
+                     url: `/shares/${token}/driveItem?$select=name,@microsoft.graph.downloadUrl`
+                   };
+                });
+                
+                const batchResponse = await fetch('https://graph.microsoft.com/v1.0/$batch', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ requests })
+                });
+                
+                const batchData = await batchResponse.json();
+                
+                if (batchData.responses) {
+                  for (let j = 0; j < batchData.responses.length; j++) {
+                     const res = batchData.responses[j];
+                     const originalUrl = chunk[parseInt(res.id)];
+                     if (res.status === 200 && res.body["@microsoft.graph.downloadUrl"]) {
+                        // We have the download URL, fetch it!
+                        try {
+                           const downloadUrl = res.body["@microsoft.graph.downloadUrl"];
+                           const imgRes = await fetch(downloadUrl);
+                           if (!imgRes.ok) throw new Error(`Failed to fetch from downloadUrl: ${imgRes.status}`);
+                           const originalBlob = await imgRes.blob();
+                           
+                           // Convert it
+                           const convertResponse = await fetch('/api/convert-image', {
+                             method: 'POST',
+                             body: originalBlob,
+                             headers: {
+                               'Content-Type': originalBlob.type || 'application/octet-stream'
+                             }
+                           });
+                           if (convertResponse.ok) {
+                             const jpegBlob = await convertResponse.blob();
+                             const arrayBuffer = await jpegBlob.arrayBuffer();
+                             results[originalUrl] = { arrayBuffer, type: "jpg" };
+                           } else {
+                             failedImages++;
+                           }
+                        } catch (e) {
+                          console.error("Failed downloading Graph item:", e);
+                          failedImages++;
+                        }
+                     } else {
+                        console.error("Graph batch error for item:", res);
+                        failedImages++;
+                     }
+                  }
+                }
+              }
+            }
+          } catch (graphErr) {
+             console.error("Graph batch process failed:", graphErr);
+          }
+        }
+        
+        // 2. Fetch other non-Graph URLs sequentially or in parallel
+        for (const url of otherUrls) {
+          try {
+             let originalBlob;
              try {
                const response = await fetch(url, { mode: 'cors' });
-               if (!response.ok) {
-                 throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-               }
+               if (!response.ok) throw new Error(`Failed to fetch image`);
                originalBlob = await response.blob();
              } catch (fetchError) {
-               console.warn("Direct fetch failed, trying proxy", fetchError);
                const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
-               if (!proxyResponse.ok) {
-                 throw new Error(`Failed to fetch image via proxy: ${proxyResponse.status} ${proxyResponse.statusText}`);
-               }
+               if (!proxyResponse.ok) throw new Error(`Failed proxy`);
                originalBlob = await proxyResponse.blob();
              }
-           }
-           
-           if (originalBlob.type.includes('text/html')) {
-             throw new Error("Fetched content is an HTML page (possibly a login redirect), not an image.");
-           }
-
-           const convertResponse = await fetch('/api/convert-image', {
-             method: 'POST',
-             body: originalBlob,
-             headers: {
-               'Content-Type': originalBlob.type || 'application/octet-stream'
+             
+             if (!originalBlob.type.includes('text/html')) {
+               const convertResponse = await fetch('/api/convert-image', {
+                 method: 'POST',
+                 body: originalBlob,
+                 headers: {
+                   'Content-Type': originalBlob.type || 'application/octet-stream'
+                 }
+               });
+               if (convertResponse.ok) {
+                 const jpegBlob = await convertResponse.blob();
+                 const arrayBuffer = await jpegBlob.arrayBuffer();
+                 results[url] = { arrayBuffer, type: "jpg" };
+               } else {
+                 failedImages++;
+               }
+             } else {
+               failedImages++;
              }
-           });
-           
-           if (!convertResponse.ok) {
-             throw new Error(`Backend image conversion failed: ${convertResponse.statusText}`);
-           }
-           
-           const widthStr = convertResponse.headers.get('x-image-width');
-           const heightStr = convertResponse.headers.get('x-image-height');
-           const width = widthStr ? parseInt(widthStr, 10) : undefined;
-           const height = heightStr ? parseInt(heightStr, 10) : undefined;
-           
-           const jpegBlob = await convertResponse.blob();
-           const arrayBuffer = await jpegBlob.arrayBuffer();
-           return { arrayBuffer, type: "jpg" as const, width, height };
-        } catch (error: any) {
-          console.error("Error fetching image", error);
-          failedImages++;
-          return null;
+          } catch (e) {
+             console.error("Failed other image:", e);
+             failedImages++;
+          }
         }
+        
+        return results;
       };
 
-      await exportPettyCashToPrint(filteredEntries, fetchImage, printWindow);
+      await exportPettyCashToPrint(filteredEntries, fetchImagesBatch, printWindow);
       if (failedImages > 0) {
         toast.warning(`Export completed, but ${failedImages} images failed to load.`);
       } else {
@@ -523,7 +627,7 @@ export function PettyCash() {
         
         if (finalReceiptUrl) updatePayload.receipt_url = finalReceiptUrl;
 
-        const { data, error } = await supabase.from('petty_cash').update(updatePayload).eq('id', editingId).select();
+                const { data, error } = await supabase.from('petty_cash').update(updatePayload).eq('id', editingId).select();
         if (error) throw error;
         
         if (!data || data.length === 0) {
@@ -533,6 +637,16 @@ export function PettyCash() {
         const updatedEntries = entries.map(e => String(e.id) === editingId ? { ...e, ...updatePayload } : e);
         setEntries(updatedEntries);
         toast.success("Petty Cash entry updated successfully!");
+        
+        // Add notification for admins/chief_sthapathy for updates
+        const expAmt = data[0].expenditure_amount ? `Rs. ${data[0].expenditure_amount}` : '';
+        const advAmt = data[0].advance_amount ? `Rs. ${data[0].advance_amount}` : '';
+        const amtStr = expAmt ? `Expense: ${expAmt}` : (advAmt ? `Advance: ${advAmt}` : '');
+        const notificationTitle = `Updated Petty Cash Entry: ${data[0].bill_name || data[0].category}`;
+        const notificationMessage = `Project: ${data[0].project_name || 'N/A'} | ${amtStr} | Reason: ${data[0].reason || 'N/A'} | Paid By: ${data[0].raised_by_name || 'N/A'}`;
+        
+        await addNotification(notificationTitle, notificationMessage);
+
         setEditingId(null);
         setShowForm(false);
         setForm(emptyForm);
@@ -568,7 +682,11 @@ export function PettyCash() {
         if (error) throw error;
 
         if (data) {
-          setEntries([data[0], ...entries]);
+          setEntries(prev => {
+            const exists = prev.find(e => e.id === data[0].id);
+            if (exists) return prev;
+            return [data[0], ...prev];
+          });
           toast.success("Petty Cash entry added successfully!");
           
           // Add notification for admins/chief_sthapathy
@@ -726,6 +844,15 @@ export function PettyCash() {
           <p className="text-slate-500 dark:text-zinc-400 mt-1">Manage expenditures and advances</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0 print:hidden">
+          
+          
+          <Button 
+            onClick={handleMicrosoftLogout} 
+            variant="outline" 
+            className="font-bold border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/30"
+          >
+            Clear MS Auth
+          </Button>
           
           <Button 
             onClick={handleExport} 
