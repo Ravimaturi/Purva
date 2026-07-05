@@ -43,6 +43,14 @@ export interface FilePermissionsConfig {
     edit: UserRole[];
     delete: UserRole[];
   };
+  timeTracking: {
+    create: UserRole[];
+    edit: UserRole[];
+    delete: UserRole[];
+  };
+  salaryManagement: {
+    manage: UserRole[];
+  };
   dashboard: {
     view: UserRole[];
   };
@@ -128,6 +136,14 @@ const DEFAULT_CONFIG: FilePermissionsConfig = {
     edit: ["admin", "finance_manager"],
     delete: ["admin"],
   },
+  timeTracking: {
+    create: ["admin", "chief_sthapathy", "deputy_sthapathy", "assistant_sthapathy", "junior_sthapathy", "finance_manager", "employee"],
+    edit: ["admin", "chief_sthapathy"],
+    delete: ["admin", "chief_sthapathy"],
+  },
+  salaryManagement: {
+    manage: ["admin", "finance_manager"],
+  },
   dashboard: {
     view: ["admin", "chief_sthapathy", "finance_manager"],
   },
@@ -171,6 +187,14 @@ interface FileSettingsContextType {
     role: UserRole | undefined,
     action: "create" | "edit" | "delete",
   ) => boolean;
+  canManageTimeTracking: (
+    role: UserRole | undefined,
+    action: "create" | "edit" | "delete",
+  ) => boolean;
+  canManageSalaries: (
+    role: UserRole | undefined,
+    action: "manage",
+  ) => boolean;
   canViewDashboard: (role: UserRole | undefined) => boolean;
   canManageBackups: (role: UserRole | undefined) => boolean;
 }
@@ -202,6 +226,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
             vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
             pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
             assets: parsed.assets || DEFAULT_CONFIG.assets,
+            timeTracking: parsed.timeTracking || DEFAULT_CONFIG.timeTracking,
+            salaryManagement: parsed.salaryManagement || DEFAULT_CONFIG.salaryManagement,
             dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
             backups: parsed.backups || DEFAULT_CONFIG.backups,
           });
@@ -226,6 +252,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
             vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
             pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
             assets: parsed.assets || DEFAULT_CONFIG.assets,
+            timeTracking: parsed.timeTracking || DEFAULT_CONFIG.timeTracking,
+            salaryManagement: parsed.salaryManagement || DEFAULT_CONFIG.salaryManagement,
             dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
             backups: parsed.backups || DEFAULT_CONFIG.backups,
           });
@@ -260,6 +288,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
                 vendors: parsed.vendors || DEFAULT_CONFIG.vendors,
                 pettyCash: parsed.pettyCash || DEFAULT_CONFIG.pettyCash,
                 assets: parsed.assets || DEFAULT_CONFIG.assets,
+            timeTracking: parsed.timeTracking || DEFAULT_CONFIG.timeTracking,
+            salaryManagement: parsed.salaryManagement || DEFAULT_CONFIG.salaryManagement,
                 dashboard: parsed.dashboard || DEFAULT_CONFIG.dashboard,
                 backups: parsed.backups || DEFAULT_CONFIG.backups,
              }));
@@ -372,6 +402,24 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
     return config.assets[action].includes(role);
   };
 
+  const canManageTimeTracking = (
+    role: UserRole | undefined,
+    action: "create" | "edit" | "delete",
+  ) => {
+    if (!role) return false;
+    if (role === "admin" || role === "chief_sthapathy") return true;
+    return config.timeTracking[action].includes(role);
+  };
+
+  const canManageSalaries = (
+    role: UserRole | undefined,
+    action: "manage",
+  ) => {
+    if (!role) return false;
+    if (role === "admin") return true;
+    return config.salaryManagement[action].includes(role);
+  };
+
   const canViewDashboard = (role: UserRole | undefined) => {
     if (!role) return false;
     if (role === "admin" || role === "chief_sthapathy") return true;
@@ -396,6 +444,8 @@ export const FileSettingsProvider: React.FC<{ children: ReactNode }> = ({
         canManageVendors,
         canManagePettyCash,
         canManageAssets,
+        canManageTimeTracking,
+        canManageSalaries,
         canViewDashboard,
         canManageBackups,
       }}
