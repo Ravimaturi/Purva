@@ -32,7 +32,7 @@ export const TimeTracking: React.FC = () => {
     "Concept Design"
   ];
   
-  const allActivities = [...DEFAULT_ACTIVITIES, ...customActivities];
+  const allActivities = Array.from(new Set([...DEFAULT_ACTIVITIES, ...customActivities]));
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -200,7 +200,7 @@ export const TimeTracking: React.FC = () => {
             </div>
           </div>
           
-          <div className="space-y-1.5" key={projects.length ? 'loaded' : 'loading'}>
+          <div className="space-y-1.5" key={'proj-' + (projects.length ? 'loaded' : 'loading')}>
             <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Project</Label>
             <Select 
               value={formData.project_name} 
@@ -219,7 +219,7 @@ export const TimeTracking: React.FC = () => {
             </Select>
           </div>
 
-          <div className="space-y-1.5" key={teamMembers.length ? 'loaded' : 'loading'}>
+          <div className="space-y-1.5" key={'team-' + (teamMembers.length ? 'loaded' : 'loading')}>
             <Label className="text-xs font-bold uppercase tracking-widest text-slate-400">Team Member</Label>
             <Select 
               value={formData.user_id} 
