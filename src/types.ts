@@ -167,3 +167,12 @@ export interface ProjectFile {
   uploaded_by: string;
   created_at: string;
 }
+
+export interface EmployeeSalary {
+  id: string;
+  profile_id: string;
+  monthly_salary: number;
+  effective_date: string;
+  created_at?: string;
+  created_by?: string;
+}
