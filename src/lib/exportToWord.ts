@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, BorderStyle, WidthType, AlignmentType, HeadingLevel } from "docx";
+import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
 
 export interface ExportEntry {
@@ -20,70 +20,31 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
 
   children.push(
     new Paragraph({
-      text: "Petty Cash Report",
+      text: "Petty Cash Receipts",
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
       spacing: { after: 400 },
     })
   );
 
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
+  const entriesWithReceipts = entries.filter(e => e.receipt_url);
 
-    const table = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 1, color: "cccccc" },
-        bottom: { style: BorderStyle.SINGLE, size: 1, color: "cccccc" },
-        left: { style: BorderStyle.SINGLE, size: 1, color: "cccccc" },
-        right: { style: BorderStyle.SINGLE, size: 1, color: "cccccc" },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "eeeeee" },
-        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "eeeeee" },
-      },
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Date", bold: true })] })], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-            new TableCell({ children: [new Paragraph(entry.date)] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Category", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph(entry.category)] }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Bill/Vendor", bold: true })] })], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-            new TableCell({ children: [new Paragraph(entry.bill_name || "-")] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Project", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph(entry.project_name || "-")] }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Advance", bold: true })] })], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-            new TableCell({ children: [new Paragraph(`Rs. ${entry.advance_amount || 0}`)] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Expenditure", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph(`Rs. ${entry.expenditure_amount || 0}`)] }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Reason/Comments", bold: true })] })], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-            new TableCell({ children: [new Paragraph(entry.reason || "-")], columnSpan: 3 }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Raised By (Entered)", bold: true })] })], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-            new TableCell({ children: [new Paragraph(entry.entered_by_name || "-")] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Paid By (Owner)", bold: true })] })] }),
-            new TableCell({ children: [new Paragraph(entry.raised_by_name || "-")] }),
-          ],
-        }),
-      ],
-    });
+  for (let i = 0; i < entriesWithReceipts.length; i++) {
+    const entry = entriesWithReceipts[i];
 
-    children.push(table);
-    children.push(new Paragraph({ spacing: { after: 200 } }));
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Date: `, bold: true }),
+          new TextRun({ text: `${entry.date}` }),
+          new TextRun({ text: `Amount: `, bold: true, break: 1 }),
+          new TextRun({ text: `Rs. ${entry.expenditure_amount || 0}` }),
+          new TextRun({ text: `Reason: `, bold: true, break: 1 }),
+          new TextRun({ text: `${entry.reason || "-"}` }),
+        ],
+        spacing: { after: 200 },
+      })
+    );
 
     if (entry.receipt_url) {
       try {
@@ -107,12 +68,13 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
         }
 
         if (imageData) {
-          let calcWidth = 400;
-          let calcHeight = 400;
+          let calcWidth = 500;
+          let calcHeight = 500;
           const img = imageData as any;
           if (img.width && img.height) {
-            calcHeight = Math.round((400 / img.width) * img.height);
+            calcHeight = Math.round((500 / img.width) * img.height);
           }
+
           children.push(
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -153,22 +115,23 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
     }
 
     children.push(new Paragraph({ spacing: { after: 400 } }));
-
-    if ((i + 1) % 2 === 0 && i !== entries.length - 1) {
+    
+    if (i !== entriesWithReceipts.length - 1) {
       children.push(
         new Paragraph({
           pageBreakBefore: true,
         })
       );
-    } else if (i !== entries.length - 1) {
-      children.push(
-        new Paragraph({
-          text: "--------------------------------------------------------------------------------",
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 400, after: 400 },
-        })
-      );
     }
+  }
+
+  if (entriesWithReceipts.length === 0) {
+      children.push(
+          new Paragraph({
+              text: "No receipts found for the selected entries.",
+              alignment: AlignmentType.CENTER,
+          })
+      );
   }
 
   const doc = new Document({
@@ -181,5 +144,5 @@ export const exportPettyCashToWord = async (entries: ExportEntry[], imageFetcher
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `PettyCash_Export_${new Date().toISOString().split("T")[0]}.docx`);
+  saveAs(blob, `Receipts_Export_${new Date().toISOString().split("T")[0]}.docx`);
 };
