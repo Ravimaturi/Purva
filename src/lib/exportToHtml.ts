@@ -14,7 +14,7 @@ export interface ExportEntry {
 
 export const exportPettyCashToPrint = async (
   entries: ExportEntry[],
-  imageFetcher?: (url: string) => Promise<{ arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp", width?: number, height?: number } | null>,
+  imageFetcher?: (urls: string[]) => Promise<Record<string, { arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp", width?: number, height?: number } | null>>,
   printWindow?: Window | null
 ) => {
   const entriesWithReceipts = entries.filter(e => e.receipt_url);
@@ -86,8 +86,7 @@ export const exportPettyCashToPrint = async (
         <th style="text-align: right">Expenditure</th>
       </tr>
     </thead>
-    <tbody>
-`;
+    <tbody>`;
 
   entries.forEach(entry => {
     htmlContent += `
@@ -127,8 +126,7 @@ export const exportPettyCashToPrint = async (
         Rs. ${(totalAdvance - totalExpenditure).toFixed(2)}
       </strong>
     </div>
-  </div>
-`;
+  </div>`;
 
   if (entriesWithReceipts.length > 0) {
     htmlContent += `
@@ -137,10 +135,42 @@ export const exportPettyCashToPrint = async (
       </div>
     `;
     
-    for (let i = 0; i < entriesWithReceipts.length; i++) {
-      const entry = entriesWithReceipts[i];
-      
-      htmlContent += `
+    // Fetch all receipt images in parallel
+    const totalReceipts = entriesWithReceipts.length;
+    let completedReceipts = 0;
+    
+    // Batch fetch all images first if fetcher is provided
+    let fetchedImagesMap: Record<string, { arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp" } | null> | null = null;
+    if (imageFetcher) {
+      if (printWindow && printWindow.document) {
+        const statusEl = printWindow.document.getElementById('loading-status');
+        if (statusEl) statusEl.innerText = "Fetching images in batch...";
+      }
+      const urls = entriesWithReceipts.map(e => e.receipt_url).filter(Boolean);
+      try {
+        fetchedImagesMap = await imageFetcher(urls);
+      } catch (err) {
+        console.error("Batch fetch failed", err);
+        fetchedImagesMap = {};
+      }
+    }
+
+
+    const updateProgress = () => {
+      if (printWindow && printWindow.document) {
+        const statusEl = printWindow.document.getElementById('loading-status');
+        const progressBarEl = printWindow.document.getElementById('loading-progress-bar');
+        if (statusEl) {
+          statusEl.innerText = `Fetched ${completedReceipts} of ${totalReceipts} receipts...`;
+        }
+        if (progressBarEl) {
+          progressBarEl.style.width = `${(completedReceipts / totalReceipts) * 100}%`;
+        }
+      }
+    };
+
+    const receiptPromises = entriesWithReceipts.map(async (entry) => {
+      let resultHtml = `
         <div class="receipt-container">
           <div class="details">
             <div><strong>Date:</strong> ${entry.date || '-'}</div>
@@ -156,9 +186,10 @@ export const exportPettyCashToPrint = async (
         try {
           let imageData: { arrayBuffer: ArrayBuffer, type: "jpg" | "png" | "gif" | "bmp" } | null = null;
           
-          if (imageFetcher) {
-            imageData = await imageFetcher(entry.receipt_url);
-          } else {
+          // Fetch logic has moved out to batch before the loop
+          if (fetchedImagesMap && fetchedImagesMap[entry.receipt_url]) {
+             imageData = fetchedImagesMap[entry.receipt_url];
+          } else if (!imageFetcher) {
             const response = await fetch(entry.receipt_url, { mode: 'cors' });
             if (response.ok) {
               const blob = await response.blob();
@@ -172,29 +203,43 @@ export const exportPettyCashToPrint = async (
               throw new Error(`HTTP error! status: ${response.status}`);
             }
           }
-
           if (imageData) {
-            const base64String = btoa(
-              new Uint8Array(imageData.arrayBuffer)
-                .reduce((data, byte) => data + String.fromCharCode(byte), '')
-            );
             const mimeType = imageData.type === 'jpg' ? 'image/jpeg' : `image/${imageData.type}`;
-            const dataUrl = `data:${mimeType};base64,${base64String}`;
-            htmlContent += `<img src="${dataUrl}" alt="Receipt image" />`;
+            
+            // Fast native conversion to base64
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+               const blob = new Blob([imageData!.arrayBuffer], { type: mimeType });
+               const reader = new FileReader();
+               reader.onloadend = () => resolve(reader.result as string);
+               reader.onerror = reject;
+               reader.readAsDataURL(blob);
+            });
+            
+            resultHtml += `<img src="${dataUrl}" alt="Receipt image" />`;
           } else {
-            htmlContent += `<div class="error">[Receipt Image Unavailable]</div>`;
+            resultHtml += `<div class="error">[Receipt Image Unavailable]</div>`;
           }
         } catch (error) {
           console.error(`Failed to load image for entry ${entry.id}`, error);
-          htmlContent += `<div class="error">(Failed to load receipt image)</div>`;
+          resultHtml += `<div class="error">(Failed to load receipt image)</div>`;
         }
       }
       
-      htmlContent += `
+      resultHtml += `
           </div>
         </div>
       `;
-    }
+      
+      completedReceipts++;
+      updateProgress();
+      
+      return resultHtml;
+    });
+
+    // Update progress initially
+    updateProgress();
+    const resolvedReceipts = await Promise.all(receiptPromises);
+    htmlContent += resolvedReceipts.join('');
   }
 
   htmlContent += `
